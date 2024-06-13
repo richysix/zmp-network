@@ -1,7 +1,12 @@
 #! /usr/bin/env python
 
 ''' Script to take a DETCT counts file, subset to required samples
-and aggregate the count data from regions to genes '''
+and aggregate the count data from regions to genes.
+It expects a samples file with experiment names and sample names and
+a count file 
+This script creates directories for each experiment in the current working
+directory if they don't already exist and saves a file of counts, subset
+to the correct samples and aggregated to the gene level. '''
 
 import argparse
 import polars.selectors as cs
