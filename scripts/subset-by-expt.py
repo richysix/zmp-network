@@ -16,7 +16,7 @@ import gzip
 import os
 from itertools import repeat
 
-def output_aggregate_counts_for_expt(expt_name, df, sample_info):
+def output_aggregate_counts_for_expt(expt_name, df, sample_info, args):
     ''' Function to subset the data frame to just the counts for an 
     experiment aggregate the counts from the transcript to the gene 
     level and output to a file '''
@@ -25,6 +25,19 @@ def output_aggregate_counts_for_expt(expt_name, df, sample_info):
         ).select("sample").with_columns(pl.Series("suffix", [" count"])
         ).select(pl.concat_str(pl.all())
         ).to_series(0).to_list()
+    # create directory
+    if not os.path.exists(expt_name):
+        os.mkdir(expt_name)
+    # write samples file
+    outfile = os.path.join(expt_name, "samples.txt")
+    sample_info.filter(expt = expt_name
+        ).write_csv(outfile, separator = "\t")
+    # check if any of the samples are present in the count file
+    if not any([ x in df.columns for x in sample_names ]):
+        print(f"{expt_name}: None of the required samples are present in "
+                f"the counts file")
+        return(None)
+        
     # select columns by name
     subset = df.select(cs.by_name(df.columns[0:15]) | 
             cs.by_name(sample_names)
@@ -35,8 +48,7 @@ def output_aggregate_counts_for_expt(expt_name, df, sample_info):
         ).agg(
             cs.ends_with("count").sum()
         )
-    if not os.path.exists(expt_name):
-        os.mkdir(expt_name)
+    # output counts file
     outfile = os.path.join(expt_name, "counts-by-gene.tsv")
     subset.write_csv(outfile, separator = "\t")
 
@@ -66,9 +78,9 @@ def main(args):
         all_data = all_data.rename(col_map)
 
     for expt in expts:
-        output_aggregate_counts_for_expt(expt, all_data, sample_info)
         if args.verbose:
             print(expt)
+        output_aggregate_counts_for_expt(expt, all_data, sample_info, args)
 
 if __name__ == '__main__':
     desc = ''' Script to take a DETCT counts file, subset to required samples
