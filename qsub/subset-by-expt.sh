@@ -10,6 +10,7 @@ source bash_functions.sh
 USAGE="subset-by-expt.sh [options] expt_file counts_file"
 
 OPTIONS="Options:
+    -o    Output Directory [default: CWD]
     -p    Python version [default: 3.12.4]
     -s    script directory [default: $HOME/checkouts/zmp-network/scripts]
     -d    print debugging info
@@ -20,10 +21,12 @@ OPTIONS="Options:
 # default values
 debug=0
 verbose=1
+OUTPUT_DIR=""
 PYTHON_VERSION="3.12.4"
 SCRIPT_DIR="$HOME/checkouts/zmp-network/scripts"
-while getopts ":p:s:dhqv" opt; do
+while getopts ":o:p:s:dhqv" opt; do
   case $opt in
+    o)  OUTPUT_DIR="--output_dir $OPTARG" ;;
     p)  PYTHON_VERSION=$OPTARG  ;;
     s)  SCRIPT_DIR=$OPTARG ;;
     d)  debug=1  ;;
@@ -41,13 +44,14 @@ module load Python/$PYTHON_VERSION
 
 if [[ $debug -gt 0 ]]; then
     echo "Python version = $PYTHON_VERSION
+Output Dir = $OUTPUT_DIR
 Script directory: $SCRIPT_DIR
 Expt file: $1
 Counts file: $2"
 fi
 
 lines=$( gzip -cd $2 | wc -l )
-python $SCRIPT_DIR/subset-by-expt.py --infer_schema_length=$lines $1 $2
+python $SCRIPT_DIR/subset-by-expt.py --infer_schema_length=$lines $OUTPUT_DIR $1 $2
 SUCCESS=$?
 
 verbose=1

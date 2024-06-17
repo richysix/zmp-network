@@ -26,13 +26,7 @@ def output_aggregate_counts_for_expt(expt_name, df, sample_info, expts_outfh, ar
         ).select("sample").with_columns(pl.Series("suffix", [" count"])
         ).select(pl.concat_str(pl.all())
         ).to_series(0).to_list()
-    # create directory
-    if not os.path.exists(expt_name):
-        os.mkdir(expt_name)
-    # write samples file
-    outfile = os.path.join(expt_name, "samples.txt")
-    sample_info.filter(expt = expt_name
-        ).write_csv(outfile, separator = "\t")
+
     # check if any of the samples are present in the count file
     if not any([ x in df.columns for x in sample_names ]):
         print(f"{expt_name}: None of the required samples are present in "
@@ -40,6 +34,18 @@ def output_aggregate_counts_for_expt(expt_name, df, sample_info, expts_outfh, ar
         return(None)
     else:
         print(f"{expt_name}", file = expts_outfh)
+
+    # create directory
+    if args.output_dir is None:
+        output_dir = expt_name
+    else:
+        output_dir = os.path.join(args.output_dir, expt_name)
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
+    # write samples file
+    outfile = os.path.join(output_dir, "samples.txt")
+    sample_info.filter(expt = expt_name
+        ).write_csv(outfile, separator = "\t")
         
     # select columns by name
     subset = df.select(cs.by_name(df.columns[0:15]) | 
@@ -52,7 +58,7 @@ def output_aggregate_counts_for_expt(expt_name, df, sample_info, expts_outfh, ar
             cs.ends_with("count").sum()
         )
     # output counts file
-    outfile = os.path.join(expt_name, "counts-by-gene.tsv")
+    outfile = os.path.join(output_dir, "counts-by-gene.tsv")
     subset.write_csv(outfile, separator = "\t")
 
 def main(args):
@@ -82,6 +88,11 @@ def main(args):
 
     # open output file
     expts_outfh = open(args.expts_outfile, mode = 'w')
+    # create output dir
+    if args.output_dir is not None:
+        if not os.path.exists(args.output_dir):
+            os.mkdir(args.output_dir)
+
     for expt in expts:
         if args.verbose:
             print(expt)
@@ -95,6 +106,9 @@ if __name__ == '__main__':
         type=str, default='all.csv', help='Samples file name')
     parser.add_argument('count_file', nargs='?', metavar='COUNTS',
         type=str, default='all.csv', help='Counts file name')
+    parser.add_argument('--output_dir', default=None, type=str,
+        metavar = "OUTPUT DIR",
+        help='Directory to output expts to [default: %(default)s]')
     parser.add_argument('--expts_outfile', default='expts.txt', type=str,
         metavar = "EXPTS FILE",
         help='File name to output expt names to [default: %(default)s]')
