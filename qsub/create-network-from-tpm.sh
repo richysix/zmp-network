@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # create-network-from-tpm.sh - Script to create TPM and
 # then use MCL to create a basic correlation network
+# Parameters are 
+# Directory: This should contain counts-by-gene.tsv and samples.tsv
+# Transcripts_file: A file containing GeneIDs and gene lengths
 #$ -cwd
 #$ -pe smp 1
 #$ -l h_rt=1:0:0
@@ -96,7 +99,7 @@ error_checking $SUCCESS "counts-to-tpm SUCCEEDED." "counts-to-tpm FAILED: $SUCCE
 # run inital MCL
 $SCRIPT_DIR/mcl-clustering-coexpr.sh \
 -j $KNN_PARAMS -c $MEASURE -l $LABELS -r $SKIP_ROWS -s $SKIP_COLS -m $MCL_VERSION \
-$dir/counts-by-gene.tsv 
+$dir/all-tpm.tsv
 
 # run MCL clustering
 INFLATION=""
@@ -105,4 +108,4 @@ for INFL in "${INFL_PARAMS[@]}"; do
 done
 $SCRIPT_DIR/mcl-clustering-coexpr.sh \
 $INFLATION $FILTER_OPT -c $MEASURE -l $LABELS -r $SKIP_ROWS -s $SKIP_COLS -m $MCL_VERSION \
-$dir/counts-by-gene.tsv 
+$dir/all-tpm.tsv
