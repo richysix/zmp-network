@@ -36,9 +36,14 @@ process CREATE_NETWORK {
     """ $params.QsubDir/create-network-from-tpm.sh \
     $params.inflationParams $params.threshold \
     $params.knnTestParams $params.knn \
+    $params.outputBase $params.corMeasure $params.labels $params.skipRows \
+    $params.skipCols $params.mclVersion $params.RVersion \
     $expt_dir $params.RefDir/$params.transcriptFile
     """
 }
+
+
+
 
 workflow {
 
