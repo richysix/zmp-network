@@ -103,7 +103,7 @@ if __name__ == '__main__':
     and aggregate the count data from regions to genes '''
     parser = argparse.ArgumentParser(description = desc)
     parser.add_argument('sample_file', nargs='?', metavar='SAMPLES',
-        type=str, default='all.csv', help='Samples file name')
+        type=str, default='samples.tsv', help='Samples file name')
     parser.add_argument('count_file', nargs='?', metavar='COUNTS',
         type=str, default='all.csv', help='Counts file name')
     parser.add_argument('--output_dir', default=None, type=str,
