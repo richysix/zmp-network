@@ -23,15 +23,30 @@ process SUBSET {
     """ $params.QsubDir/subset-by-expt.sh -s ${params.ScriptDir} -o ${params.CountDir} ${expt_file} ${all_counts_file} """
 }
 
+process CREATE_NETWORK {
+    clusterOptions "-l h_vmem=$params.big_mem"
+
+    input:
+    path expt_dir
+
+    output:
+    path expt_dir.name
+
+    script:
+    """ $params.QsubDir/create-network-from-tpm.sh \
+    $params.inflationParams $params.threshold \
+    $params.knnTestParams $params.knn \
+    $expt_dir $params.RefDir/$params.transcriptFile
+    """
+}
+
 workflow {
 
     expt_file_ch = SUBSET(params.expts, params.all_counts)
         .flatten()
     expt_file_ch.view()
 
-    expts_ch = expt_file_ch
-        .splitText()
-        .map { it.trim() }
-        .view()
+    network_ch = CREATE_NETWORK(expt_file_ch)
+    network_ch.view()
 
 }
