@@ -53,7 +53,7 @@ def output_aggregate_counts_for_expt(expt_name, df, sample_info, expts_outfh, ar
         ).filter(pl.col("GeneID").str.contains("ENSDARG") & 
         ~pl.col("GeneID").str.contains(",")
         ).select(~cs.contains("3' end read count")
-        ).group_by(pl.col("GeneID")
+        ).group_by(pl.col("GeneID", "Gene name")
         ).agg(
             cs.ends_with("count").sum()
         )
