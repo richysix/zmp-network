@@ -43,7 +43,7 @@ def output_aggregate_counts_for_expt(expt_name, df, sample_info, expts_outfh, ar
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
     # write samples file
-    outfile = os.path.join(output_dir, "samples.txt")
+    outfile = os.path.join(output_dir, "samples.tsv")
     sample_info.filter(expt = expt_name
         ).write_csv(outfile, separator = "\t")
         

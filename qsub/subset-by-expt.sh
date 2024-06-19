@@ -55,7 +55,7 @@ python $SCRIPT_DIR/subset-by-expt.py --infer_schema_length=$lines $OUTPUT_DIR $1
 SUCCESS=$?
 
 verbose=1
-error_checking $SUCCESS "job nextflow SUCCEEDED." "job nextflow FAILED: $SUCCESS"
+error_checking $SUCCESS "job subset SUCCEEDED." "job nextflow FAILED: $SUCCESS"
 exit $SUCCESS
 
 # AUTHOR
