@@ -1,6 +1,7 @@
 # zmp-network
 Correlation network of zebrafish development
 
+## Setup
 ```
 scratch 
 cd detct/grcz11/
@@ -41,6 +42,8 @@ gzip -cd everything/filter-strict/all.csv.gz | -n1001 | \
 gzip -c > everything/filter-strict/all-test.csv.gz
 ```
 
+## Subset by experiment
+
 Create script to read in all counts, subset to each expt, 
 aggregate counts to genes and write out subset file
 ```
@@ -71,3 +74,47 @@ Run full pipeline
 ```
 nextflow run $SCRIPT
 ```
+
+## Calculate TPM
+Needs transcript info. Download e98 annotation
+```
+cd $basedir
+mkdir reference
+cd reference/
+wget https://ftp.ensembl.org/pub/release-98/gtf/danio_rerio/Danio_rerio.GRCz11.98.chr.gtf.gz
+```
+
+R script to create FPKM/TPM
+Expects count and sample files and transcript info
+Uses the GTF to calculate transcript info and outputs a transcripts file for 
+future use
+e.g. for an expt dir containing samples.txt and counts-by-gene.tsv
+```
+Rscript ~/checkouts/bioinf-gen/counts-to-fpkm-tpm.R \
+--gtf_file $basedir/reference/Danio_rerio.GRCz11.98.chr.gtf.gz \
+--transcripts_file $basedir/reference/Danio_rerio.GRCz11.98.transcripts.tsv \
+--fpkm --tpm --output_base $dir/all $dir/samples.txt $dir/counts-by-gene.tsv
+```
+
+## Cluster TPM
+
+Shell script to run MCL to create and cluster a coexpression network
+To run in exploratory mode to find suitable pruning parameters use -j
+```
+scripts/mcl-clustering-coexpr.sh -j 100/200/20 DIR TRANSCRIPT_FILE
+```
+
+To run in clustering mode use either -k (k-nearest-neighbours param) or 
+-t (Correlation threshold)
+```
+scripts/mcl-clustering-coexpr.sh -i 1.4 -i 4 -k 150 DIR TRANSCRIPT_FILE
+# or
+scripts/mcl-clustering-coexpr.sh -i 1.4 -i 4 -t 0.6 DIR TRANSCRIPT_FILE
+```
+
+## Add CREATE_NETWORK process to Nextflow script
+
+The process takes an expt directory name as input and runs 
+`create-network-from-tpm.sh` with parameters set in the config file.
+
+Output is the same expt directory name.
