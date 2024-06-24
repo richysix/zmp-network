@@ -29,7 +29,7 @@ Create file of expt names, sample names and conditions
 ```
 join -t$'\t' -1 2 <( sort -t$'\t' -k2,2 local_effect/expt2samples.txt ) \
 <( sort -t$'\t' -k1,1 everything/samples.txt ) | \
-awk -F"\t" 'BEGIN{ OFS = "\t" } { print $2, $1, $4 }' | \
+awk -F"\t" 'BEGIN{ OFS = "\t" } { print $2, $1, $4 }' | sort -u | \
 cat <( echo -e "expt\tsample\tcondition" ) - > expt-sample-condition.tsv
 # subset for testing
 grep -E "^expt|(capzb1_hi1858bTg|dnmt8|zmp_ph1)\b" \
@@ -49,7 +49,8 @@ aggregate counts to genes and write out subset file
 ```
 # count lines of all file
 lines=$( gzip -cd everything/filter-strict/all.csv.gz | wc -l )
-python scripts/subset-by-expt.py --infer_schema_length=$lines expt-sample-condition-test.tsv everything/filter-strict/all-test.csv.gz
+python scripts/subset-by-expt.py --infer_schema_length=$lines \
+expt-sample-condition-test.tsv everything/filter-strict/all-test.csv.gz
 ```
 
 Create Nextflow pipeline to create and test networks for each experiment
@@ -90,7 +91,7 @@ Uses the GTF to calculate transcript info and outputs a transcripts file for
 future use
 e.g. for an expt dir containing samples.txt and counts-by-gene.tsv
 ```
-Rscript ~/checkouts/bioinf-gen/counts-to-fpkm-tpm.R \
+Rscript scripts/counts-to-fpkm-tpm.R \
 --gtf_file $basedir/reference/Danio_rerio.GRCz11.98.chr.gtf.gz \
 --transcripts_file $basedir/reference/Danio_rerio.GRCz11.98.transcripts.tsv \
 --fpkm --tpm --output_base $dir/all $dir/samples.txt $dir/counts-by-gene.tsv
@@ -116,5 +117,8 @@ scripts/mcl-clustering-coexpr.sh -i 1.4 -i 4 -t 0.6 DIR TRANSCRIPT_FILE
 
 The process takes an expt directory name as input and runs 
 `create-network-from-tpm.sh` with parameters set in the config file.
+`create-network-from-tpm.sh` runs `counts-to-fpkm-tpm.R ` to convert the 
+counts to TPM and then creates and clusters the network using 
+`mcl-clustering-coexpr.sh`
 
 Output is the same expt directory name.
