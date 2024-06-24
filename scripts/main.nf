@@ -25,7 +25,16 @@ process SUBSET {
 
 process CREATE_NETWORK {
     clusterOptions "-l h_vmem=$params.big_mem"
-
+    time { 
+        if (task.attempt > 1) {
+            return '240h'
+        } else {
+            return '1h'
+        }
+    }
+    errorStrategy { task.exitStatus in 137..140 ? 'retry' : 'terminate' }
+    maxRetries 3
+    
     input:
     path expt_dir
 
