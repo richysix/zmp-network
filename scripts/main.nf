@@ -26,44 +26,160 @@ process SUBSET {
 """
 }
 
-process CREATE_NETWORK {
-    clusterOptions "-l h_vmem=$params.big_mem"
-    time { 
-        if (task.attempt > 1) {
-            return '240h'
-        } else {
-            return '1h'
-        }
-    }
-    errorStrategy { task.exitStatus in 137..140 ? 'retry' : 'terminate' }
-    maxRetries 3
-    
-    input:
+process CREATE_BASE_NETWORK {
+    label 'big_mem_retry'
+    publishDir "results", pattern: "*/all-tpm*"
+
+    input: 
     path expt_dir
 
     output:
-    path expt_dir.name
+    tuple env(dir), path("*/all-tpm.tsv"), path("*/all-tpm.tab"), path("*/all-tpm-orig.mci")
 
     script:
-    """ $params.QsubDir/create-network-from-tpm.sh \
-    $params.inflationParams $params.threshold \
-    $params.knnTestParams $params.knn \
-    $params.outputBase $params.corMeasure $params.labels $params.skipRows \
-    $params.skipCols $params.mclVersion $params.RVersion \
-    $expt_dir $params.RefDir/$params.transcriptFile
+    """
+    dir=\$( basename $expt_dir )
+    awk -F"\\t" '{if(NR > 1){ print \$2 "\\t" \$3 }}' \
+     $expt_dir/samples.tsv > $expt_dir/samples.txt
+
+    module load R/$params.RVersion
+    Rscript $params.ScriptDir/counts-to-fpkm-tpm.R \
+    --transcripts_file $params.RefDir/$params.transcriptFile \
+    --output_base \$dir/all --output_format tsv \
+    --tpm $expt_dir/samples.txt $expt_dir/counts-by-gene.tsv
+
+    module load MCL/$params.mclVersion
+
+    mcxarray -data \$dir/all-tpm.tsv -co 0 \
+    $params.skipRows $params.skipCols \
+    $params.corMeasure $params.labels \
+    -o \$dir/all-tpm-orig.mci -write-tab \$dir/all-tpm.tab
     """
 }
 
+// Create a basic network with a correlation threshold of 0.2
+// Test varying threshold and knn parameters
+process TEST_PARAMETERS {
+    label 'big_mem_retry'
+    publishDir "results", pattern: "*/all-tpm*"
+    
+    input:
+    tuple val(dir), path(tpms_file)
 
+    output:
+    tuple val(dir), path("$dir/all-tpm-20.mci"), 
+        path("$dir/all-tpm.cor-stats.tsv"), path("$dir/all-tpm.knn-stats.tsv")
 
+    script:
+    """
+    module load MCL/$params.mclVersion
+    
+    mkdir $dir
+    mcxarray -data $tpms_file -co 0.2 \
+    $params.skipRows $params.skipCols -tf 'abs()' \
+    $params.corMeasure $params.labels -o $dir/all-tpm-20.mci
+    
+    # vary correlation
+    mcx query -imx $dir/all-tpm-20.mci --vary-correlation \
+    --output-table > $dir/all-tpm.cor-stats.tsv
+
+    # test varying k-nearest neighbours
+    mcx query -imx $dir/all-tpm-20.mci -vary-knn $params.knnTestParams \
+    --output-table > $dir/all-tpm.knn-stats.tsv
+    """
+}
+
+// Threshold
+process THRESHOLD {
+    label 'big_mem_retry'
+    publishDir "results", pattern: "*/all-tpm*"
+    
+    input:
+    tuple val(dir), path(mci_file)
+
+    output:
+    tuple val(dir), path("*/*-[kt][0-9]*.mci")
+
+    script:
+    Integer suffix = params.threshold * 100
+    outputBase = [dir, "/all-tpm"].join('')
+    thresholdBase = [outputBase, "t$suffix"].join("-")
+    knnBase = [outputBase, '20', "k$params.knn"].join("-")
+    knnThresholdBase = [outputBase, "t$suffix", "k$params.knn"].join("-")
+    """
+    module load MCL/$params.mclVersion
+
+    mkdir $dir
+    threshold='${params.threshold}'
+    if [[ ! -z \$threshold ]]; then
+        mcx alter -imx ${mci_file} -tf \
+        "gq($params.threshold), add(-$params.threshold)" \
+        -o ${thresholdBase}.mci
+    fi
+    knn='${params.knn}'
+    if [[ ! -z \$knn ]]; then
+        mcx alter -imx ${mci_file} -tf "add(-0.2), #knn($params.knn)" \
+        -o ${knnBase}.mci
+    fi
+
+    if [[ ! -z \$knn && ! -z \$threshold ]]; then
+        mcx alter -imx ${mci_file} \
+        -tf "gq($params.threshold), add(-$params.threshold), #knn($params.knn)" \
+        -o ${knnThresholdBase}.mci
+    fi
+    """
+}
+
+// Cluster nextwork
+process CLUSTER {
+    label 'big_mem_retry'
+    publishDir "results", pattern: "*/all-tpm*"
+    
+    input:
+    tuple val(dir), path(mci_file)
+    each inflation
+
+    output:
+    path "*/*.mci.I[0-9]*"
+
+    script:
+    Integer inflationSuffix = inflation * 10
+    """
+    mkdir $dir
+
+    module load MCL/$params.mclVersion
+    mcl $mci_file -I $inflation -o $dir/${mci_file}.I${inflationSuffix}
+    
+    mci_base=\$( basename $mci_file .mci )
+    clm info $mci_file $dir/${mci_file}.I${inflationSuffix} >> $dir/\${mci_base}.info.txt
+    """
+}
 
 workflow {
 
-    expt_file_ch = SUBSET(params.expts, params.all_counts)
+    subset_output_ch = SUBSET(params.expts, params.all_counts)
         .flatten()
-    expt_file_ch.view()
+        .view()
 
-    network_ch = CREATE_NETWORK(expt_file_ch)
-    network_ch.view()
+    orig_ch = CREATE_BASE_NETWORK(subset_output_ch)
+        .map { [it[0], it[1]] }
+        .view()
 
+    test_params_ch = TEST_PARAMETERS(orig_ch)
+        .map { [it[0], it[1]] }
+        .view()
+
+    if (params.clustering) {
+        threshold_ch = THRESHOLD(test_params_ch)
+        .flatMap { dir = it[0]
+        mci_with_id = []
+        for (mci_file in it[1]) {
+            mci_with_id.add([dir, mci_file])
+        }
+        return(mci_with_id) }
+        .view()
+
+        cluster_ch = CLUSTER(threshold_ch, params.inflationParams)
+            .view()
+    }
 }
