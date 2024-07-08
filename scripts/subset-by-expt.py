@@ -36,10 +36,10 @@ def output_aggregate_counts_for_expt(expt_name, df, sample_info, expts_outfh, ar
         print(f"{expt_name}", file = expts_outfh)
 
     # create directory
-    if args.output_dir is None:
+    if args.output_dir_prefix is None:
         output_dir = expt_name
     else:
-        output_dir = os.path.join(args.output_dir, expt_name)
+        output_dir = "-".join([args.output_dir_prefix, expt_name])
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
     # write samples file
@@ -89,9 +89,9 @@ def main(args):
     # open output file
     expts_outfh = open(args.expts_outfile, mode = 'w')
     # create output dir
-    if args.output_dir is not None:
-        if not os.path.exists(args.output_dir):
-            os.mkdir(args.output_dir)
+#    if args.output_dir is not None:
+#        if not os.path.exists(args.output_dir):
+#            os.mkdir(args.output_dir)
 
     for expt in expts:
         if args.verbose:
@@ -106,8 +106,8 @@ if __name__ == '__main__':
         type=str, default='samples.tsv', help='Samples file name')
     parser.add_argument('count_file', nargs='?', metavar='COUNTS',
         type=str, default='all.csv', help='Counts file name')
-    parser.add_argument('--output_dir', default=None, type=str,
-        metavar = "OUTPUT DIR",
+    parser.add_argument('--output_dir_prefix', default=None, type=str,
+        metavar = "OUTPUT DIR PREFIX",
         help='Directory to output expts to [default: %(default)s]')
     parser.add_argument('--expts_outfile', default='expts.txt', type=str,
         metavar = "EXPTS FILE",

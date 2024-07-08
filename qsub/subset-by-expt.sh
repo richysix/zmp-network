@@ -26,7 +26,7 @@ PYTHON_VERSION="3.12.4"
 SCRIPT_DIR="$HOME/checkouts/zmp-network/scripts"
 while getopts ":o:p:s:dhqv" opt; do
   case $opt in
-    o)  OUTPUT_DIR="--output_dir $OPTARG" ;;
+    o)  OUTPUT_DIR="--output_dir_prefix $OPTARG" ;;
     p)  PYTHON_VERSION=$OPTARG  ;;
     s)  SCRIPT_DIR=$OPTARG ;;
     d)  debug=1  ;;

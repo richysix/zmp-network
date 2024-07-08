@@ -10,17 +10,20 @@ log.info """\
 """
 
 process SUBSET {
-    clusterOptions "-l h_vmem=$params.big_mem"
+    label 'big_mem_retry'
 
     input: 
     val expt_file
     val all_counts_file
 
     output:
-    path "$params.CountDir/*"
+    path("${params.DirPrefix}-*")
 
     script:
-    """ $params.QsubDir/subset-by-expt.sh -s ${params.ScriptDir} -o ${params.CountDir} ${expt_file} ${all_counts_file} """
+    """
+    $params.QsubDir/subset-by-expt.sh -s ${params.ScriptDir} \
+-o ${params.DirPrefix} ${expt_file} ${all_counts_file}
+"""
 }
 
 process CREATE_NETWORK {
