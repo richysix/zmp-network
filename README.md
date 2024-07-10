@@ -122,3 +122,41 @@ counts to TPM and then creates and clusters the network using
 `mcl-clustering-coexpr.sh`
 
 Output is the same expt directory name.
+
+## Change processes
+
+Change CREATE_NETWORK to CREATE_BASE_NETWORK. Also change output to be the 
+files created rather than the directory otherwise process doesn't get cached 
+properly, because directory has being modified during each run.
+
+Next process is TEST_PARAMETERS, which creates a base network with a 
+correlation threshold of 0.2. It then runs `mcx query --vary-correlation` and
+`mcx query -vary-knn`. Outputs are the mci file for the 0.2 network and the 
+stats output by each of the query commands.
+
+The next two processes are conditional on the --clustering parameter being 
+set to true. This is so that the a first run of the pipeline can be done to see
+the effect of varying the parameters and ten a subsequent run can be done with
+threshold and clustering parameters set. 
+
+The first process is THRESHOLD, which uses either or both of --threshold and 
+-knn to reduce the edges in the network. The outputs are the mci files for each
+pruned network.
+
+The second is CLUSTERING which clusters each network for different inflation 
+values set in --inflationParams. The output is the mci file for the clustered 
+network.
+
+Run the pipeline for tfap2a experiments (zmp_ph192, zmp_ph238, zmp_ph250).
+```
+qsub qsub/run-nextflow.sh \
+-p "--expts /data/scratch/bty114/detct/grcz11/expt-sample-condition-tfap2.tsv --knn 240 --threshold 0.44" \
+scripts/main.nf 
+```
+
+Rerun with -resume and --clustering=true
+```
+qsub qsub/run-nextflow.sh \
+-p "--expts /data/scratch/bty114/detct/grcz11/expt-sample-condition-tfap2.tsv --knn 240 --threshold 0.44 --clustering true" \
+-r current scripts/main.nf 
+```
