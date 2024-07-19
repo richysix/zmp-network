@@ -154,6 +154,101 @@ qsub qsub/run-nextflow.sh \
 scripts/main.nf 
 ```
 
+Look through stats output
+There are TPM values for 26772 genes. Want threshold values with < 10% 
+singletons (~2677) and median node degree of ~100.
+
+### zmp_ph192
+
+*tfap2a/tfap2c* incross at 4-9S.
+
+#### Vary correlation threshold
+
+```
+column -t results/expt-zmp_ph192/all-tpm.cor-stats.tsv | \
+awk '{ if(NR == 1){ print $0 } if($15 >= 0.36 && $15 <= 0.44){ print $0 }}' 
+```
+L      D      R     S      E           cce    EWmean    EWmed     EWiqr      NDmean   NDmed  NDiqr  CCF  eff  Cutoff
+25407  1365   0     1365   0.154163    24111  0.446038  0.417025  0.0901631  486.156  235    529    NA   NA   0.36
+25401  1371   0     1371   0.0948671   24100  0.48829   0.456881  0.0907996  299.164  126    317    NA   NA   0.4
+25127  1645   0     1641   0.0582407   23583  0.532257  0.497171  0.0930104  183.663  68     185    NA   NA   0.44
+
+**Good value would be between 0.4 and 0.44**
+
+#### k-nearest neighbours
+
+```
+column -t results/expt-zmp_ph192/all-tpm.knn-stats.tsv | \
+awk '{ if(NR == 1){ print $0 } if($15 >= 200 && $15 <= 280){ print $0 }}' 
+```
+L      D     R    S     E          cce    EWmean    EWmed     EWiqr     NDmean   NDmed  NDiqr  CCF  eff  kNN
+25388  1384  0    1384  0.0439979  24075  0.483225  0.454095  0.170955  138.748  125    119    NA   NA   280
+25383  1389  0    1389  0.0402976  24066  0.487921  0.459038  0.172018  127.079  113    112    NA   NA   260
+25378  1394  0    1392  0.0366309  24056  0.493085  0.464496  0.173266  115.516  101    105    NA   NA   240
+25368  1404  0    1400  0.0329596  24037  0.498951  0.470645  0.174534  103.939  90     97     NA   NA   220
+25357  1415  0    1413  0.02933    24016  0.505518  0.477465  0.175884  92.4926  78     90     NA   NA   200
+
+**-knn=240 looks good**
+
+### zmp_ph238
+
+```
+column -t results/expt-zmp_ph238/all-tpm.cor-stats.tsv | \
+awk '{ if(NR == 1){ print $0 } if($15 >= 0.36 && $15 <= 0.44){ print $0 }}' 
+```
+L      D      R     S      E            cce    EWmean    EWmed     EWiqr      NDmean    NDmed  NDiqr  CCF  eff  Cutoff
+25866  906    0     906    0.149381     24990  0.463226  0.423574  0.111324   490.371   181    483    NA   NA   0.36
+25853  919    0     919    0.095753     24965  0.510771  0.469036  0.124613   314.327   89     262    NA   NA   0.4
+25414  1358   0     1346   0.0632589    24124  0.558243  0.516746  0.139254   207.659   43     141    NA   NA   0.44
+
+**t=0.4 looks good**
+
+#### k-nearest neighbours
+
+```
+column -t results/expt-zmp_ph238/all-tpm.knn-stats.tsv | \
+awk '{ if(NR == 1){ print $0 } if($15 >= 200 && $15 <= 280){ print $0 }}' 
+```
+L      D     R    S     E          cce    EWmean    EWmed     EWiqr     NDmean   NDmed  NDiqr  CCF  eff  kNN
+25687  1085  0    1060  0.040902   24646  0.446262  0.412873  0.142716  134.268  126    99     NA   NA   280
+25642  1130  0    1100  0.0375998  24559  0.449998  0.416921  0.143246  123.428  115    94     NA   NA   260
+25575  1197  0    1157  0.0342866  24431  0.454219  0.421404  0.143892  112.552  103    87     NA   NA   240
+25502  1266  4    1219  0.0309899  24292  0.458936  0.42641   0.144805  101.73   92     80     NA   NA   220
+25413  1355  4    1291  0.0277109  24123  0.464266  0.431925  0.145805  90.966   82     73     NA   NA   200
+
+**-knn=240 looks good**
+
+### zmp_ph250
+
+*tfap2a/tfap2c* incross at Prim-5 (24 hpf).
+
+#### Vary correlation threshold
+
+```column -t results/expt-zmp_ph250/all-tpm.cor-stats.tsv | 
+awk '{ if(NR == 1){ print $0 } if($15 >= 0.36 && $15 <= 0.44){ print $0 }}' 
+```
+L      D      R     S      E            cce    EWmean    EWmed     EWiqr        NDmean    NDmed  NDiqr  CCF  eff  Cutoff
+25988  784    0     784    0.100194     25226  0.431786  0.408874  0.0783687    282.969   142    260    NA   NA   0.36
+25972  800    0     800    0.0567753    25195  0.47287   0.4495    0.079552     160.346   68     148    NA   NA   0.4
+25278  1494   0     1472   0.0323994    23867  0.514078  0.490278  0.0811265    91.5031   30     83     NA   NA   0.44
+
+**-t=0.4 looks good**
+
+#### k-nearest neighbours
+
+```
+column -t results/expt-zmp_ph250/all-tpm.knn-stats.tsv | \
+awk '{ if(NR == 1){ print $0 } if($15 >= 200 && $15 <= 280){ print $0 }}' 
+```
+L      D    R  S    E          cce    EWmean    EWmed     EWiqr     NDmean   NDmed  NDiqr  CCF  eff  kNN
+25988  784  0  784  0.0536895  25226  0.42615   0.4031    0.120983  151.631  142    83     NA   NA   280
+25988  784  0  784  0.0492074  25226  0.430648  0.407289  0.122486  138.973  129    79     NA   NA   260
+25988  784  0  784  0.0447728  25226  0.435545  0.411811  0.124166  126.448  116    74     NA   NA   240
+25988  784  0  784  0.040361   25226  0.440924  0.416775  0.126067  113.988  104    69     NA   NA   220
+25988  784  0  784  0.0359927  25226  0.446868  0.422318  0.128309  101.651  91     63     NA   NA   200
+
+**-knn=220-240**
+
 Rerun with -resume and --clustering=true
 ```
 qsub qsub/run-nextflow.sh \
