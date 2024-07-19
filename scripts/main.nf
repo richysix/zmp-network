@@ -98,7 +98,8 @@ process THRESHOLD {
     tuple val(dir), path(mci_file)
 
     output:
-    tuple val(dir), path("*/*-[kt][0-9]*.mci")
+    tuple val(dir), path("$dir/*-[kt][0-9]*.mci"),
+        path("$dir/*stats.tsv")
 
     script:
     Integer suffix = params.threshold * 100
@@ -122,10 +123,17 @@ process THRESHOLD {
         -o ${knnBase}.mci
     fi
 
+    module load datamash
     if [[ ! -z \$knn && ! -z \$threshold ]]; then
         mcx alter -imx ${mci_file} \
         -tf "gq($params.threshold), add(-$params.threshold), #knn($params.knn)" \
         -o ${knnThresholdBase}.mci
+        mcx query -imx ${knnThresholdBase}.mci > ${knnThresholdBase}.stats.tsv
+        # Summarise stats
+        paste <( datamash -s groupby 2 count 2 < ${knnThresholdBase}.stats.tsv | awk '{ if(\$1 == 1){ print \$2 } }' ) \
+            <( datamash --header-in --round 1 mean degree median degree iqr degree < ${knnThresholdBase}.stats.tsv ) | \
+        awk -F"\t" 'BEGIN{ OFS = "\t" } {if(\$1 == ""){ print "0", \$2, \$3, \$4 } else{ print \$0 }}' | \
+        cat <( echo -e "S\tDmean\tDmedian\tDiqr" ) - > ${knnThresholdBase}.cor-knn-stats.tsv
     fi
     """
 }
