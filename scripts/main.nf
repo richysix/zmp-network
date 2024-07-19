@@ -160,6 +160,12 @@ process CLUSTER {
     
     mci_base=\$( basename $mci_file .mci )
     clm info $mci_file $dir/${mci_file}.I${inflationSuffix} >> $dir/\${mci_base}.info.txt
+
+    clm info --node-all-measures --node-self-measures $mci_file \
+    $dir/${mci_file}.I${inflationSuffix} > $dir/${mci_file}.I${inflationSuffix}.stats.tsv
+
+    module load Python/3.12.4
+    python ${params.ScriptDir}/summarise_clustering.py $dir/${mci_file}.I${inflationSuffix}
     """
 }
 
