@@ -151,7 +151,7 @@ Run the pipeline for tfap2a experiments (zmp_ph192, zmp_ph238, zmp_ph250).
 ```
 qsub qsub/run-nextflow.sh \
 -p "--expts /data/scratch/bty114/detct/grcz11/expt-sample-condition-tfap2.tsv --knn 240 --threshold 0.44" \
-scripts/main.nf 
+scripts/main.nf
 ```
 
 Look through stats output
@@ -254,4 +254,10 @@ Rerun with -resume and --clustering=true
 qsub qsub/run-nextflow.sh \
 -p "--expts /data/scratch/bty114/detct/grcz11/expt-sample-condition-tfap2.tsv --knn 240 --threshold 0.44 --clustering true" \
 -r current scripts/main.nf 
+```
+
+```
+cd ~/work/apocrita/data/scratch/bty114/detct/grcz11/nf
+rsync -avzkL --filter "+ all-tpm[-.]*.[tc]sv" --filter "+ *png" --filter "+ */" \
+--filter "- *" apocrita:/data/scratch/bty114/detct/grcz11/nf/results ./
 ```
