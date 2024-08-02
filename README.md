@@ -261,3 +261,50 @@ cd ~/work/apocrita/data/scratch/bty114/detct/grcz11/nf
 rsync -avzkL --filter "+ all-tpm[-.]*.[tc]sv" --filter "+ *png" --filter "+ */" \
 --filter "- *" apocrita:/data/scratch/bty114/detct/grcz11/nf/results ./
 ```
+
+### Testing MCL 2 nodes and edges script
+
+Script needs mci file, gene file, cluster file and names for the output nodes
+and edges files
+
+Make annotation file with nodes ids to gene ids and names
+```
+# run script to download annotation
+cd /data/scratch/bty114/genomes/GRCz11/e92
+qsub ~/checkouts/uge-job-scripts/get_ensembl_gene_annotation.sh -e 95 \
+-f ~/checkouts/bio-misc/get_ensembl_gene_annotation.pl -s "Danio rerio" 
+
+# use annotation to create mapping from node ids to gene ids and names
+join -t$'\t' -1 2 <( sort -t$'\t' -k2,2 all-tpm.tab ) \
+<( awk -F"\t" 'BEGIN{OFS = "\t" } { print $1, $7, $8, NR }' Dr-e92-annotation.txt | \
+sort -t$'\t' -k1,1 ) | \
+awk -F"\t" 'BEGIN{OFS = "\t"} { print $2, $5, $1, $3, $4}' > node_id-gene_id-gene_name.txt
+```
+
+Download mcl2nodes script
+```
+cd $gitdir/scripts/
+wget https://raw.githubusercontent.com/richysix/bioinf-gen/6d5ccc694b3d300fede4e5af47713dff41c111f3/mcl2nodes-edges.py
+chmod a+x mcl2nodes-edges.py summarise_clustering.py
+```
+
+```
+cd /data/scratch/bty114/detct/grcz11/nf-test/
+mkdir tmp
+cd tmp
+
+cp ../work/4e/7015a58d55fd0fcfcac9ba857e2a2b/all-tpm-t60.mci ./
+cp ../work/4e/7015a58d55fd0fcfcac9ba857e2a2b/expt-zmp_ph23/all-tpm-t60.mci.I40 ./
+
+# create genes info file
+join -t$'\t' -1 2 <( sort -t$'\t' -k2,2 all-tpm.tab ) \
+<( awk -F"\t" 'BEGIN{OFS = "\t" } { print $1, $7, $8, NR }' Dr-e92-annotation.txt | \
+sort -t$'\t' -k1,1 ) | awk -F"\t" 'BEGIN{OFS = "\t"} { print $2, $5, $1, $3, $4}' > node_id-gene_id-gene_name.txt
+
+# run script
+python ~/checkouts/zmp-network/scripts/mcl2nodes-edges.py \
+all-tpm-t60.mci all-tpm-t60.mci.I40 node_id-gene_id-gene_name.txt \
+--nodes_file expt-zmp_ph23/all-tpm-t60.I40.nodes.csv \
+--edges_file expt-zmp_ph23/all-tpm-t60.I40.edges.csv --edge_offset 0.6
+```
+

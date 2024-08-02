@@ -7,7 +7,18 @@ log.info """\
   Testing: ${params.testing}
   Expt to sample file: ${params.expts}
   All counts file: ${params.all_counts}
+  MCL version: ${params.mclVersion}
 """
+
+def get_threshold(m) {
+    def t
+    if (m[0][1] == "t") {
+        t = (m[0][2].toInteger()) / 100
+    } else {
+        t = 0
+    }
+    return t
+}
 
 process SUBSET {
     label 'big_mem_retry'
@@ -105,7 +116,7 @@ process THRESHOLD {
     Integer suffix = params.threshold * 100
     outputBase = [dir, "/all-tpm"].join('')
     thresholdBase = [outputBase, "t$suffix"].join("-")
-    knnBase = [outputBase, '20', "k$params.knn"].join("-")
+    knnBase = [outputBase, 't20', "k$params.knn"].join("-")
     knnThresholdBase = [outputBase, "t$suffix", "k$params.knn"].join("-")
     """
     module load MCL/$params.mclVersion
@@ -138,24 +149,26 @@ process THRESHOLD {
     """
 }
 
-// Cluster nextwork
+// Cluster network
 process CLUSTER {
     label 'big_mem_retry'
     publishDir "results", pattern: "*/all-tpm*"
     
     input:
-    tuple val(dir), path(mci_file)
+    tuple val(dir), val(threshold), path(mci_file)
     each inflation
 
     output:
-    path "*/*.mci.I[0-9]*"
+    tuple val(dir), val(threshold), val(inflation), path(mci_file),
+        path("*/*.mci.I[0-9][0-9]"), path("*/*.mci.I[0-9][0-9].stats.tsv"), 
+        path("*/*.mci.I[0-9][0-9].cl*")
 
     script:
     Integer inflationSuffix = inflation * 10
     """
-    mkdir $dir
+    mkdir ${dir}
 
-    module load MCL/$params.mclVersion
+    module load MCL/${params.mclVersion}
     mcl $mci_file -I $inflation -o $dir/${mci_file}.I${inflationSuffix}
     
     mci_base=\$( basename $mci_file .mci )
@@ -164,9 +177,37 @@ process CLUSTER {
     clm info --node-all-measures --node-self-measures $mci_file \
     $dir/${mci_file}.I${inflationSuffix} > $dir/${mci_file}.I${inflationSuffix}.stats.tsv
 
-    module load Python/3.12.4
+    module load Python/$params.PythonVersion
     python ${params.ScriptDir}/summarise_clustering.py $dir/${mci_file}.I${inflationSuffix}
     """
+}
+
+process MCLTOGRAPH {
+    publishDir "results", pattern: "*/all-tpm*"
+
+    input:
+    tuple val(dir), path(tab_file), val(threshold), val(inflation), 
+        path(mci_file), path(cluster_file)
+    path(annotation_file)
+
+    output:
+    tuple val(dir), val(threshold), val(inflation), path("all-tpm*.nodes.csv"),
+        path("all-tpm*.edges.csv")
+
+    script:
+    matches = (threshold =~ /^(t?)(\d*)-?(k?)(\d*)$/)
+    t_num = get_threshold(matches)
+    """
+    # run mcl2nodes script
+    cluster_base=\$( basename $cluster_file )
+    
+    module load Python/$params.PythonVersion
+    python ${params.ScriptDir}/mcl2nodes-edges.py \
+    --nodes_file \${cluster_base}.nodes.csv \
+    --edges_file \${cluster_base}.edges.csv \
+    --edge_offset ${t_num} \
+    $mci_file $cluster_file $tab_file $annotation_file
+    """ 
 }
 
 workflow {
@@ -175,25 +216,36 @@ workflow {
         .flatten()
         .view()
 
-    orig_ch = CREATE_BASE_NETWORK(subset_output_ch)
+    orig_ch = CREATE_BASE_NETWORK(subset_output_ch).view()
+
+    tpm_ch = orig_ch
         .map { [it[0], it[1]] }
         .view()
 
-    test_params_ch = TEST_PARAMETERS(orig_ch)
+    test_params_ch = TEST_PARAMETERS(tpm_ch)
         .map { [it[0], it[1]] }
         .view()
 
     if (params.clustering) {
         threshold_ch = THRESHOLD(test_params_ch)
-        .flatMap { dir = it[0]
-        mci_with_id = []
-        for (mci_file in it[1]) {
-            mci_with_id.add([dir, mci_file])
-        }
-        return(mci_with_id) }
-        .view()
+            .flatMap { dir = it[0]
+                mci_with_id = []
+                for (mci_file in it[1]) {
+                    matches = (mci_file =~ /^.*\/all-tpm-(t?\d*-?k?\d*).mci/)
+                    mci_with_id.add([dir, matches[0][1], mci_file])
+                }
+                return(mci_with_id)
+            }
+            .view()
 
         cluster_ch = CLUSTER(threshold_ch, params.inflationParams)
             .view()
+
+        mcl2graph_ch = orig_ch.cross(cluster_ch)
+            .map { [it[0][0], it[0][2], it[1][1], it[1][2], it[1][3], it[1][4] ] }
+            .view()
+        
+        annotation_ch = channel.value(params.AnnotationFile)
+        MCLTOGRAPH(mcl2graph_ch, annotation_ch).view()
     }
 }
