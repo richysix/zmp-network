@@ -55,7 +55,7 @@ process CREATE_BASE_NETWORK {
 
     module load R/$params.RVersion
     Rscript $params.ScriptDir/counts-to-fpkm-tpm.R \
-    --transcripts_file $params.RefDir/$params.transcriptFile \
+    --transcripts_file $params.transcriptFile \
     --output_base \$dir/all --output_format tsv \
     --tpm $expt_dir/samples.txt $expt_dir/counts-by-gene.tsv
 
@@ -183,7 +183,7 @@ process CLUSTER {
 }
 
 process MCLTOGRAPH {
-    publishDir "results", pattern: "*/all-tpm*"
+    publishDir "results", pattern: "*/all-tpm*.csv"
 
     input:
     tuple val(dir), path(tab_file), val(threshold), val(inflation), 
@@ -191,20 +191,21 @@ process MCLTOGRAPH {
     path(annotation_file)
 
     output:
-    tuple val(dir), val(threshold), val(inflation), path("all-tpm*.nodes.csv"),
-        path("all-tpm*.edges.csv")
+    tuple val(dir), val(threshold), val(inflation), path("*/all-tpm*.nodes.csv"),
+        path("*/all-tpm*.edges.csv")
 
     script:
     matches = (threshold =~ /^(t?)(\d*)-?(k?)(\d*)$/)
     t_num = get_threshold(matches)
     """
+    mkdir ${dir}
     # run mcl2nodes script
     cluster_base=\$( basename $cluster_file )
     
     module load Python/$params.PythonVersion
     python ${params.ScriptDir}/mcl2nodes-edges.py \
-    --nodes_file \${cluster_base}.nodes.csv \
-    --edges_file \${cluster_base}.edges.csv \
+    --nodes_file ${dir}/\${cluster_base}.nodes.csv \
+    --edges_file ${dir}/\${cluster_base}.edges.csv \
     --edge_offset ${t_num} \
     $mci_file $cluster_file $tab_file $annotation_file
     """ 
