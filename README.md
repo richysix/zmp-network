@@ -308,3 +308,28 @@ all-tpm-t60.mci all-tpm-t60.mci.I40 node_id-gene_id-gene_name.txt \
 --edges_file expt-zmp_ph23/all-tpm-t60.I40.edges.csv --edge_offset 0.6
 ```
 
+Move output to new directory
+```
+scratch 
+mkdir zmp-network
+cp -a detct/grcz11/nf zmp-network/
+cd zmp-network
+export gitdir=$HOME/checkouts/zmp-network
+export basedir=$(pwd)
+screen -S zmp-network
+cd nf
+```
+
+Do fresh run of the pipeline
+```
+# Runtime of 240 can't be used at the moment, due to Apocrita maintenance
+qsub -l h_rt=24:0:0 qsub/run-nextflow.sh \
+-p "--expts $SCRATCH/zmp-network/expt-sample-condition-tfap2.tsv --knn 240 --threshold 0.44 --clustering true" \
+scripts/main.nf 
+
+# MCLTOGRAPH process did not publish the correct files
+# Rerun with resume
+qsub -l h_rt=24:0:0 qsub/run-nextflow.sh \
+-p "--expts $SCRATCH/zmp-network/expt-sample-condition-tfap2.tsv --knn 240 --threshold 0.44 --clustering true" \
+-r current scripts/main.nf 
+```
