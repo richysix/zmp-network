@@ -333,3 +333,34 @@ qsub -l h_rt=24:0:0 qsub/run-nextflow.sh \
 -p "--expts $SCRATCH/zmp-network/expt-sample-condition-tfap2.tsv --knn 240 --threshold 0.44 --clustering true" \
 -r current scripts/main.nf 
 ```
+
+# Dev Stages Biolayout network
+
+Compare to biolayout network from White et al.
+Create script to convert biolayout file to adjancency matrix
+```
+cd ~/work/apocrita/data/scratch/bty114/zmp-network
+mkdir zfs-dev-stages-biolayout/
+cd zfs-dev-stages-biolayout/
+# Download layout file from Sharepoint
+# run script
+cd ~/checkouts/zmp-network
+source .venv/bin/activate
+python ~/checkouts/zmp-network/scripts/biolayout-to-adj-matrix.py \
+--plot_filebase ~/work/apocrita/data/scratch/bty114/zmp-network/zfs-dev-stages-biolayout/publication_change_with_stage_r-0.94 \
+/Users/rjw26/work/apocrita/data/scratch/bty114/zmp-network/zfs-dev-stages-biolayout/publication_change_with_stage_r-0.94.layout \
+/Users/rjw26/work/apocrita/data/scratch/bty114/zmp-network/zfs-dev-stages-biolayout/publication_change_with_stage_r-0.94.summary.txt \
+/Users/rjw26/work/apocrita/data/scratch/bty114/zmp-network/zfs-dev-stages-biolayout/publication_change_with_stage_r-0.94.edge_counts.tsv 
+
+cd ~/work/apocrita/data/scratch/bty114/zmp-network
+cat zfs-dev-stages-biolayout/publication_change_with_stage_r-0.94.summary.txt
+Total Edges = 1473314
+Mean Edge Degree = 239.641
+Quartiles
+Min = 1.0
+Q1 = 9.0
+Median = 53.0
+Q3 = 309.0
+Max = 1782.0
+Number of Nodes = 12296
+```
