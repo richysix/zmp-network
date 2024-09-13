@@ -333,3 +333,13 @@ qsub -l h_rt=24:0:0 qsub/run-nextflow.sh \
 -p "--expts $SCRATCH/zmp-network/expt-sample-condition-tfap2.tsv --knn 240 --threshold 0.44 --clustering true" \
 -r current scripts/main.nf 
 ```
+
+Check attributes of DevStages network. Download from eLife paper
+```
+md5sum zfs-dev-stages-biolayout/elife-30860-supp4-v1.expression 
+e1d45ce6a8f1a0539e9bc6b60bf14be8  zfs-dev-stages-biolayout/elife-30860-supp4-v1.expression
+# matches
+BuschLab/Documents/cam-busch/Archive/Zebrafish_Mutation_Resource/Phenotyping/Molecular%20phenotyping/RNASeq_Developmental_stages/biolayout/GRCz10/change_with_stage.expression
+md5sum ~/Downloads/change_with_stage.expression 
+e1d45ce6a8f1a0539e9bc6b60bf14be8  /Users/rjw26/Downloads/change_with_stage.expression
+```
