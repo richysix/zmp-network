@@ -337,11 +337,17 @@ qsub -l h_rt=24:0:0 qsub/run-nextflow.sh \
 # Dev Stages Biolayout network
 
 Compare to biolayout network from White et al.
-Create script to convert biolayout file to adjancency matrix
+Download from eLife paper
 ```
 cd ~/work/apocrita/data/scratch/bty114/zmp-network
 mkdir zfs-dev-stages-biolayout/
 cd zfs-dev-stages-biolayout/
+wget -O elife-30860-supp4-v1.expression \
+https://elifesciences.org/download/aHR0cHM6Ly9jZG4uZWxpZmVzY2llbmNlcy5vcmcvYXJ0aWNsZXMvMzA4NjAvZWxpZmUtMzA4NjAtc3VwcDQtdjEuZXhwcmVzc2lvbg--/elife-30860-supp4-v1.expression?_hash=c5pjyRlx8sr7H9nqDJUF4H6KbC8UscObVlzYc6UjCF4%3D
+```
+
+Create script to convert biolayout file to adjancency matrix
+```
 # Download layout file from Sharepoint
 # run script
 cd ~/checkouts/zmp-network
