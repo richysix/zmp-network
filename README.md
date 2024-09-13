@@ -343,3 +343,41 @@ BuschLab/Documents/cam-busch/Archive/Zebrafish_Mutation_Resource/Phenotyping/Mol
 md5sum ~/Downloads/change_with_stage.expression 
 e1d45ce6a8f1a0539e9bc6b60bf14be8  /Users/rjw26/Downloads/change_with_stage.expression
 ```
+
+# Dev Stages Biolayout network
+
+Compare to biolayout network from White et al.
+Download from eLife paper
+```
+cd ~/work/apocrita/data/scratch/bty114/zmp-network
+mkdir zfs-dev-stages-biolayout/
+cd zfs-dev-stages-biolayout/
+
+wget -O elife-30860-supp4-v1.expression \
+https://elifesciences.org/download/aHR0cHM6Ly9jZG4uZWxpZmVzY2llbmNlcy5vcmcvYXJ0aWNsZXMvMzA4NjAvZWxpZmUtMzA4NjAtc3VwcDQtdjEuZXhwcmVzc2lvbg--/elife-30860-supp4-v1.expression?_hash=c5pjyRlx8sr7H9nqDJUF4H6KbC8UscObVlzYc6UjCF4%3D
+```
+
+Create script to convert biolayout file to adjancency matrix
+```
+# Download layout file from Sharepoint
+# run script
+cd ~/checkouts/zmp-network
+source .venv/bin/activate
+python ~/checkouts/zmp-network/scripts/biolayout-to-adj-matrix.py \
+--plot_filebase ~/work/apocrita/data/scratch/bty114/zmp-network/zfs-dev-stages-biolayout/publication_change_with_stage_r-0.94 \
+/Users/rjw26/work/apocrita/data/scratch/bty114/zmp-network/zfs-dev-stages-biolayout/publication_change_with_stage_r-0.94.layout \
+/Users/rjw26/work/apocrita/data/scratch/bty114/zmp-network/zfs-dev-stages-biolayout/publication_change_with_stage_r-0.94.summary.txt \
+/Users/rjw26/work/apocrita/data/scratch/bty114/zmp-network/zfs-dev-stages-biolayout/publication_change_with_stage_r-0.94.edge_counts.tsv 
+
+cd ~/work/apocrita/data/scratch/bty114/zmp-network
+cat zfs-dev-stages-biolayout/publication_change_with_stage_r-0.94.summary.txt
+Total Edges = 1473314
+Mean Edge Degree = 239.641
+Quartiles
+Min = 1.0
+Q1 = 9.0
+Median = 53.0
+Q3 = 309.0
+Max = 1782.0
+Number of Nodes = 12296
+```
