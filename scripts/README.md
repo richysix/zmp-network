@@ -1,0 +1,141 @@
+# ZMP-NETWORK Nextflow pipeline
+
+## Processes
+
+### SUBSET (big_mem_retry)
+
+Creates a sample and count file for each individual experiment with the counts
+aggregated to the gene level.
+
+Inputs:
+1. Experiment file: Tab-separated file, containing columns `expt` and `sample`
+1. Counts file: Comma-separated file containing counts for all the samples (Can be gzipped)
+
+Outputs:
+1. Tuple of directory names for each experiment with a DirPrefix (from the config file) added.
+
+This gets flattened so that the next process gets the directory names one at a
+time and runs `CREATE_BASE_NETWORK` once for each dir name.
+
+Script:
+    Runs `scripts/subset-by-expt.py`
+
+### CREATE_BASE_NETWORK
+
+Creates a base correlation network containing ALL edges.
+
+Inputs:
+1. Expt dir: path to experiment directory. Contains subset sample and count files for the
+experiment.
+
+Outputs:
+1. Dir name: name of experiment
+1. TPM file: Tab-separated file of TPMs used to create the network
+1. TAB file: File output by MCL mapping node ids to gene ids
+1. MCI file: MCL network file detailing all the edges in the network and their
+weights.
+
+Script:
+    Runs `scripts/counts-to-fpkm-tpm.R` and then `mcxarray`
+
+### TEST_PARAMETERS
+
+Creates a basic network thresholded at 0.2 and then collects stats on node 
+degree and singletons when the threshold is varied. Also collects stats on
+using k-nearest neighbours.
+
+Inputs:
+1. Dir name: name of experiment
+1. TPM file: Tab-separated file of TPMs used to create the network
+
+Outputs:
+1. Dir name: name of experiment
+1. MCI file: MCL network file detailing all the edges in the network and their
+weights.
+1. Cor stats file: File of node stats varying correlation threshold
+1. Knn stats file: File of node stats varying knn threshold
+
+Script:
+    Runs `mcxarray` and `mcx query`
+
+### THRESHOLD
+
+Using the threshold and knn parameters to create pruned networks. If both
+correlation and knn thresholds are set, a third network using both thresholds
+together is created.
+
+Inputs:
+1. Dir name: name of experiment
+1. MCI file: MCL network file detailing all the edges in the network and their
+
+Outputs:
+1. Dir name: name of experiment
+1. Tuple of MCI files: MCL network files pruned using correlation and/or 
+knn threshold. These are flattened so that the next process receives the
+expt name, string of threshold parameters and mci file for those parameters.
+1. Stats file created if both correlation and knn threshold are set
+
+Script:
+    Runs `mcx alter` and `mcx query`
+
+### CLUSTER
+
+Clusters the supplied network.
+
+    tuple val(dir), val(threshold), path(mci_file)
+    each inflation
+
+Inputs:
+1. Tuple of 
+    1. Dir name: name of experiment
+    1. Threshold string
+    1. MCI file
+1. Inflation values: From `inflationParams` in the config. This is a list.
+The CLUSTER process is run once for each inflation value in the list.
+
+Outputs:  
+Tuple of  
+1. Dir name: name of experiment
+1. Threshold value
+1. Inflation value
+1. MCI file
+1. Clustered MCI file
+1. Stats file: info on each node
+1. Tuple of summarise_clustering.py outputs (cluster sizes and histograms)
+
+The outputs are crossed with the output from CREATE_BASE_NETWORK and rearranged 
+so that the original tab file is available for the next process (MCLTOGRAPH)
+
+Script:
+Runs `mcl`, `clm info` and `scripts/summarise_clustering.py`
+
+### MCLTOGRAPH
+
+Converts the clustered MCI file to nodes and edges files. Then runs GBA on
+the network.
+
+Inputs:
+1. Tuple of:
+    1. Dir name: name of experiment
+    1. TAB file
+    1. Threshold value
+    1. Inflation value
+    1. MCI file
+    1. Clustered MCI file
+1. Annotation file: Tab-separated file of Gene annotation (Chr, Start End, ID, Name etc.)
+1. GO annotation file: Tab-separated file of GO annotation (GeneID, TermID, Component)
+
+Outputs:
+
+Tuple of  
+1. Dir name: name of experiment
+1. Threshold value
+1. Inflation value
+1. Nodes file: Comma-separated file of node information with Name and Cluster id
+1. Edges files: Comma-separated file of edge information with source, target and weight
+1. AUC file: Output file from GBA with AUC values for each GO term
+1. Gene scores file: Output file from GBA with gene scores for each GO term
+1. Plots file: Histograms of AUC values
+
+Script:
+Runs `scripts/mcl2nodes-edges.py` and `scripts/run-GBA-network.R`
