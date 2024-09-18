@@ -381,3 +381,18 @@ Q3 = 309.0
 Max = 1782.0
 Number of Nodes = 12296
 ```
+
+## Guilt By Association
+
+Install new package EGAD to run GBA analysis for ability of networks to predict
+GO annotations (Could try ZFA as well).
+
+Created a script `scripts/run-GBA-network.R` to run GBA in R
+Added this to the MCLTOGRAPH process.
+
+Rerun with -resume and --clustering=true
+```
+qsub qsub/run-nextflow.sh \
+-p "--expts /data/scratch/bty114/detct/grcz11/expt-sample-condition-tfap2.tsv --knn 240 --threshold 0.44 --clustering true -with-dag -with-report zmp-network-nf-main.html -with-timeline zmp-network-nf-timeline.html" \
+-r current scripts/main.nf 
+```

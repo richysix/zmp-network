@@ -20,6 +20,9 @@ def get_threshold(m) {
     return t
 }
 
+// process to subset the file containing all the samples
+// to each separate experiment
+// see README
 process SUBSET {
     label 'big_mem_retry'
 
@@ -183,16 +186,20 @@ process CLUSTER {
 }
 
 process MCLTOGRAPH {
-    publishDir "results", pattern: "*/all-tpm*.csv"
+    label 'huge_mem_retry'
+    publishDir "results", pattern: "*/all-tpm*.{tsv,csv,pdf}"
 
     input:
     tuple val(dir), path(tab_file), val(threshold), val(inflation), 
         path(mci_file), path(cluster_file)
     path(annotation_file)
+    path(go_annotation_file)
 
     output:
-    tuple val(dir), val(threshold), val(inflation), path("*/all-tpm*.nodes.csv"),
-        path("*/all-tpm*.edges.csv")
+    tuple val(dir), val(threshold), val(inflation), 
+        path("*/all-tpm*.nodes.csv"), path("*/all-tpm*.edges.csv"),
+        path("*/all-tpm*.auc.tsv"), path("*/all-tpm*.gene-scores.tsv"),
+        path("*/all-tpm*.GBA-plots.pdf")
 
     script:
     matches = (threshold =~ /^(t?)(\d*)-?(k?)(\d*)$/)
@@ -208,7 +215,16 @@ process MCLTOGRAPH {
     --edges_file ${dir}/\${cluster_base}.edges.csv \
     --edge_offset ${t_num} \
     $mci_file $cluster_file $tab_file $annotation_file
-    """ 
+
+    module load R/$params.RVersion
+    Rscript ${params.ScriptDir}/run-GBA-network.R \
+    --auc_file ${dir}/\${cluster_base}.auc.tsv \
+    --scores_file ${dir}/\${cluster_base}.gene-scores.tsv \
+    --plots_file ${dir}/\${cluster_base}.GBA-plots.pdf \
+    ${dir}/\${cluster_base}.nodes.csv \
+    ${dir}/\${cluster_base}.edges.csv \
+    $go_annotation_file
+    """
 }
 
 workflow {
@@ -247,6 +263,7 @@ workflow {
             .view()
         
         annotation_ch = channel.value(params.AnnotationFile)
-        MCLTOGRAPH(mcl2graph_ch, annotation_ch).view()
+        go_annotation_ch = channel.value(params.GOFile)
+        MCLTOGRAPH(mcl2graph_ch, annotation_ch, go_annotation_ch).view()
     }
 }
