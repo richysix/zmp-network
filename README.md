@@ -397,3 +397,23 @@ qsub qsub/run-nextflow.sh \
 -r current scripts/main.nf 
 ```
 
+## Pipeline DAG
+
+Create a mermaid diagram of the pipeline that can be included in the README.
+```
+qlogin
+module load nextflow
+nextflow run --expts /data/scratch/bty114/detct/grcz11/expt-sample-condition-tfap2.tsv \
+--knn 240 --threshold 0.44 --clustering true -preview -with-dag dag-20240923.mmd \
+-resume scripts/main.nf
+```
+
+`scripts/README`
+
+Created a Quarto document to create the README detailing the processes in the pipeline. 
+Create markdown file from the mermaid diagram for including the README.
+```
+cat <( echo "\`\`\`mermaid" ) \
+dag-20240923.mmd \
+<( echo "\`\`\`" ) > $gitdir/scripts/_dag-20240923.md
+```
