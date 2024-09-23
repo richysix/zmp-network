@@ -255,7 +255,8 @@ workflow {
             }
             .view()
 
-        cluster_ch = CLUSTER(threshold_ch, params.inflationParams)
+        infl_values_ch = channel.value(params.inflationParams)
+        cluster_ch = CLUSTER(threshold_ch, infl_values_ch)
             .view()
 
         mcl2graph_ch = orig_ch.cross(cluster_ch)
@@ -264,6 +265,6 @@ workflow {
         
         annotation_ch = channel.value(params.AnnotationFile)
         go_annotation_ch = channel.value(params.GOFile)
-        MCLTOGRAPH(mcl2graph_ch, annotation_ch, go_annotation_ch).view()
+        graph_ch = MCLTOGRAPH(mcl2graph_ch, annotation_ch, go_annotation_ch).view()
     }
 }
