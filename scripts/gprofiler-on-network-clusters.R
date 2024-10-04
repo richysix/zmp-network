@@ -82,21 +82,21 @@ if (any(!c("gene_id", "cluster_id") %in% colnames(nodes))) {
 }
 
 # filter clusters by size
-filtered_nodes <- nodes |> 
-  group_by(cluster_id) |> 
-  summarise(size = length(gene_id)) |> 
-  filter(size >= cmd_line_args$options[['min_cluster_size']]) |> 
+filtered_nodes <- nodes |>
+  group_by(cluster_id) |>
+  summarise(size = length(gene_id)) |>
+  dplyr::filter(size >= cmd_line_args$options[['min_cluster_size']]) |>
   semi_join(nodes, y = _, by = join_by(cluster_id))
 
 # run GO enrichment
 go_enrichment_results <- split(filtered_nodes, filtered_nodes$cluster_id) |>
-  map(\(x) run_gost(x, nodes$gene_id)) |> 
+  map(\(x) run_gost(x, nodes$gene_id)) |>
+  rlang::set_names(paste0('cluster-', unique(filtered_nodes$cluster_id))) |>
   keep(\(x) !is.null(x)) # remove ones with no enrichments
-names(go_enrichment_results) <- paste0('cluster-', names(go_enrichment_results))
 
 # bind results dfs together and write to output file
-map(go_enrichment_results, "result") |> 
-  list_rbind(names_to = "query") |> 
+map(go_enrichment_results, "result") |>
+  list_rbind(names_to = "query") |>
   write_tsv(file = cmd_line_args$options[['output_file']])
 
 if (!is.null(cmd_line_args$options[['rds_file']])) {
