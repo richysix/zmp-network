@@ -44,11 +44,11 @@ show_cols <- debug
 
 # load data
 # nodes
-nodes <- read_csv(cmd_line_args$args[1], show_col_types = show_cols)
+nodes <- read_tsv(cmd_line_args$args[1], show_col_types = show_cols)
 # nodes <- filter(nodes, cluster_id >= 80, cluster_id <= 120)
 node_idx2gene_id <- dplyr::select(nodes, node_idx, gene_id)
 # edges
-edges <- read_csv(cmd_line_args$args[2], show_col_types = show_cols)
+edges <- read_tsv(cmd_line_args$args[2], show_col_types = show_cols)
 # edges <- filter(edges, source %in% nodes$node_idx, target %in% nodes$node_idx)
 
 # convert edges to gene ids

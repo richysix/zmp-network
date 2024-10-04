@@ -187,17 +187,19 @@ process CLUSTER {
 
 process MCLTOGRAPH {
     label 'huge_mem_retry'
-    publishDir "results", pattern: "*/all-tpm*.{tsv,csv,pdf}"
+    publishDir "results", pattern: "*/all-tpm*.{graphml,tsv,csv,pdf}"
 
     input:
     tuple val(dir), path(tab_file), val(threshold), val(inflation), 
         path(mci_file), path(cluster_file)
     path(annotation_file)
     path(go_annotation_file)
+    path(zfa_annotation_file)
 
     output:
     tuple val(dir), val(threshold), val(inflation), 
-        path("*/all-tpm*.nodes.csv"), path("*/all-tpm*.edges.csv"),
+        path("*/all-tpm*.graphml"),
+        path("*/all-tpm*.nodes.tsv"), path("*/all-tpm*.edges.tsv"),
         path("*/all-tpm*.auc.tsv"), path("*/all-tpm*.gene-scores.tsv"),
         path("*/all-tpm*.GBA-plots.pdf")
 
@@ -210,20 +212,31 @@ process MCLTOGRAPH {
     cluster_base=\$( basename $cluster_file )
     
     module load Python/$params.PythonVersion
-    python ${params.ScriptDir}/mcl2nodes-edges.py \
-    --nodes_file ${dir}/\${cluster_base}.nodes.csv \
-    --edges_file ${dir}/\${cluster_base}.edges.csv \
+    python ${params.ScriptDir}/convert_mcl.py \
+    --min_cluster_size 4 --graph_id \${cluster_base} \
+    --graphml_file ${dir}/\${cluster_base}.graphml \
+    --nodes_file ${dir}/\${cluster_base}.nodes.tsv \
+    --edges_file ${dir}/\${cluster_base}.edges.tsv \
     --edge_offset ${t_num} \
     $mci_file $cluster_file $tab_file $annotation_file
 
     module load R/$params.RVersion
     Rscript ${params.ScriptDir}/run-GBA-network.R \
-    --auc_file ${dir}/\${cluster_base}.auc.tsv \
-    --scores_file ${dir}/\${cluster_base}.gene-scores.tsv \
-    --plots_file ${dir}/\${cluster_base}.GBA-plots.pdf \
-    ${dir}/\${cluster_base}.nodes.csv \
-    ${dir}/\${cluster_base}.edges.csv \
+    --auc_file ${dir}/\${cluster_base}.go.auc.tsv \
+    --scores_file ${dir}/\${cluster_base}.go.gene-scores.tsv \
+    --plots_file ${dir}/\${cluster_base}.go.GBA-plots.pdf \
+    ${dir}/\${cluster_base}.nodes.tsv \
+    ${dir}/\${cluster_base}.edges.tsv \
     $go_annotation_file
+
+    module load R/$params.RVersion
+    Rscript ${params.ScriptDir}/run-GBA-network.R \
+    --auc_file ${dir}/\${cluster_base}.zfa.auc.tsv \
+    --scores_file ${dir}/\${cluster_base}.zfa.gene-scores.tsv \
+    --plots_file ${dir}/\${cluster_base}.zfa.GBA-plots.pdf \
+    ${dir}/\${cluster_base}.nodes.tsv \
+    ${dir}/\${cluster_base}.edges.tsv \
+    $zfa_annotation_file
     """
 }
 
@@ -265,6 +278,9 @@ workflow {
         
         annotation_ch = channel.value(params.AnnotationFile)
         go_annotation_ch = channel.value(params.GOFile)
-        graph_ch = MCLTOGRAPH(mcl2graph_ch, annotation_ch, go_annotation_ch).view()
+        zfa_annotation_ch = channel.value(params.ZFAFile)
+        graph_ch = MCLTOGRAPH(
+            mcl2graph_ch, annotation_ch, go_annotation_ch, zfa_annotation_ch)
+            .view()
     }
 }
