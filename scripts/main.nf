@@ -197,8 +197,8 @@ process MCLTOGRAPH {
     path(zfa_annotation_file)
 
     output:
-    tuple val(dir), val(threshold), val(inflation), 
-        path("*/all-tpm*.graphml"),
+    tuple val(dir), val(threshold), val(inflation),
+        path(cluster_file), path("*/all-tpm*.graphml"),
         path("*/all-tpm*.nodes.tsv"), path("*/all-tpm*.edges.tsv"),
         path("*/all-tpm*.auc.tsv"), path("*/all-tpm*.gene-scores.tsv"),
         path("*/all-tpm*.GBA-plots.pdf")
@@ -207,7 +207,7 @@ process MCLTOGRAPH {
     matches = (threshold =~ /^(t?)(\d*)-?(k?)(\d*)$/)
     t_num = get_threshold(matches)
     """
-    mkdir ${dir}
+    mkdir -p ${dir}
     # run mcl2nodes script
     cluster_base=\$( basename $cluster_file )
     
@@ -237,6 +237,31 @@ process MCLTOGRAPH {
     ${dir}/\${cluster_base}.nodes.tsv \
     ${dir}/\${cluster_base}.edges.tsv \
     $zfa_annotation_file
+    """
+}
+
+process ENRICHMENT {
+    label 'local'
+    publishDir "results", pattern: "*/all-tpm*go*"
+
+    input:
+    tuple val(dir), path(cluster_file), path(nodes_file)
+
+    output:
+    tuple val(dir), path(nodes_file), path("*/all-tpm*go*")
+
+    script:
+    """
+    mkdir ${dir}
+    # run go enrichment script
+    cluster_base=\$( basename $cluster_file )
+    
+    module load R/$params.RVersion
+    Rscript ${params.ScriptDir}/gprofiler-on-network-clusters.R \
+    --min_cluster_size ${params.goMinClusterSize} \
+    --output_file ${dir}/\${cluster_base}.go-enrichments.tsv \
+    --rds_file ${dir}/\${cluster_base}.go-enrichments.rds \
+    $nodes_file 2> ${dir}/\${cluster_base}.go.err
     """
 }
 
@@ -281,6 +306,11 @@ workflow {
         zfa_annotation_ch = channel.value(params.ZFAFile)
         graph_ch = MCLTOGRAPH(
             mcl2graph_ch, annotation_ch, go_annotation_ch, zfa_annotation_ch)
+            .view()
+
+        nodes_ch = graph_ch
+            .map( { [it[0], it[3], it[5]] } )
+        enrich_ch = ENRICHMENT(nodes_ch)
             .view()
     }
 }
