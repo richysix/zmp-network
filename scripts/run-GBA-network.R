@@ -3,18 +3,18 @@
 library('optparse')
 
 option_list <- list(
-  make_option("--auc_file", action="store", default='GBA-auc.tsv',
-              help="Name of output file for AUC values of annotations [default %default]"),
-  make_option("--scores_file", action="store", default='GBA-gene-scores.tsv',
-              help="Name of output file for gene scores [default %default]"),
-  make_option("--plots_file", action="store", default='GBA-plots.pdf',
-              help="Name of plots file [default %default]"),
-  make_option("--min.term.size", action="store", default=10,
-              help="Minimum number of annotations to each group [default %default]"),
-  make_option("--max.term.size", action="store", default=1000,
-              help="Maximum number of annotations to each group [default %default]"),
-  make_option(c("-d", "--debug"), action="store_true", default=FALSE,
-              help="Print extra output [default %default]")
+  make_option("--auc_file", action = "store", default = 'GBA-auc.tsv',
+              help = "Name of output file for AUC values of annotations [default %default]"),
+  make_option("--scores_file", action = "store", default = 'GBA-gene-scores.tsv',
+              help = "Name of output file for gene scores [default %default]"),
+  make_option("--plots_file", action = "store", default = 'GBA-plots.pdf',
+              help = "Name of plots file [default %default]"),
+  make_option("--min.term.size", action = "store", default = 10,
+              help = "Minimum number of annotations to each group [default %default]"),
+  make_option("--max.term.size", action = "store", default = 1000,
+              help = "Maximum number of annotations to each group [default %default]"),
+  make_option(c("-d", "--debug"), action = "store_true", default = FALSE,
+              help = "Print extra output [default %default]")
 )
 
 desc <- paste('Script to run Guilt By Association scoring of annotation terms', 
@@ -28,7 +28,7 @@ if (interactive()) {
 }
 cmd_line_args <- parse_args(
   OptionParser(
-    option_list=option_list,
+    option_list = option_list,
     description = desc, prog = 'run-GBA-network.R',
     usage = "Usage: %prog [options] nodes_file edges_file annotation_file" ),
   args = cmd_args,
@@ -36,7 +36,7 @@ cmd_line_args <- parse_args(
 )
 
 packages <- c('EGAD', 'tidyverse')
-for( package in packages ){
+for (package in packages) {
     suppressPackageStartupMessages( suppressWarnings( library(package, character.only = TRUE) ) )
 }
 
