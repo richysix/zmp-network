@@ -34,6 +34,8 @@ cat <( echo -e "expt\tsample\tcondition" ) - > expt-sample-condition.tsv
 # subset for testing
 grep -E "^expt|(capzb1_hi1858bTg|dnmt8|zmp_ph1)\b" \
 expt-sample-condition.tsv > expt-sample-condition-test.tsv
+grep -E "^expt|zmp_ph(192|238|250)\b" \
+expt-sample-condition.tsv > expt-sample-condition-tfap2.tsv
 ```
 
 Create test counts file with subset of regions
@@ -393,11 +395,11 @@ Added this to the MCLTOGRAPH process.
 Rerun with -resume and --clustering=true
 ```
 qsub qsub/run-nextflow.sh \
--p "--expts /data/scratch/bty114/detct/grcz11/expt-sample-condition-tfap2.tsv --knn 240 --threshold 0.44 --clustering true -with-dag -with-report zmp-network-nf-main.html -with-timeline zmp-network-nf-timeline.html" \
+-p "--expts /data/scratch/bty114/detct/grcz11/expt-sample-condition-tfap2.tsv --knn 240 --threshold 0.44 --clustering true" \
 -r current scripts/main.nf 
 ```
 
-## Pipeline DAG
+## Pipeline DAG and report
 
 Create a mermaid diagram of the pipeline that can be included in the README.
 ```
@@ -406,6 +408,23 @@ module load nextflow
 nextflow run --expts /data/scratch/bty114/detct/grcz11/expt-sample-condition-tfap2.tsv \
 --knn 240 --threshold 0.44 --clustering true -preview -with-dag dag-20240923.mmd \
 -resume scripts/main.nf
+
+# with report
+nextflow run --expts /data/scratch/bty114/detct/grcz11/expt-sample-condition-tfap2.tsv \
+--knn 240 --threshold 0.44 --clustering true -preview -with-dag dag-20240923.mmd \
+-with-report zmp-network-nf-main.html -with-timeline zmp-network-nf-timeline.html
+-resume scripts/main.nf
+# if rerunning, either delete zmp-network-nf-main.html and zmp-network-nf-timeline.html
+# or enable report.overwrite option in config
+```
+
+### Rerun with dag and report
+```
+mkdir reports
+today=$(date +%Y%m%d)
+qsub qsub/run-nextflow.sh \
+-p "--expts /data/scratch/bty114/detct/grcz11/expt-sample-condition-tfap2.tsv --knn 240 --threshold 0.44 --clustering true -with-dag reports/dag-$today.mmd -with-report reports/zmp-network-nf-main-$today.html -with-timeline reports/zmp-network-nf-timeline-$today.html" \
+-r current scripts/main.nf
 ```
 
 `scripts/README`
