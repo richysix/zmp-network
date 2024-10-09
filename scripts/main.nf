@@ -5,9 +5,11 @@ log.info """\
   -----------------------------
 
   Testing: ${params.testing}
+  Clustering: ${params.clustering}
   Expt to sample file: ${params.expts}
   All counts file: ${params.all_counts}
-  MCL version: ${params.mclVersion}
+  Threshold params: ${params.threshold}
+  Inflation Params: ${params.inflationParams}
 """
 
 def get_threshold(m) {
@@ -74,7 +76,7 @@ process CREATE_BASE_NETWORK {
 // Create a basic network with a correlation threshold of 0.2
 // Test varying threshold and knn parameters
 process TEST_PARAMETERS {
-    label 'big_mem_retry'
+    label 'med_mem_retry'
     publishDir "results", pattern: "*/all-tpm*"
     
     input:
@@ -105,7 +107,7 @@ process TEST_PARAMETERS {
 
 // Threshold
 process THRESHOLD {
-    label 'big_mem_retry'
+    label 'retry'
     publishDir "results", pattern: "*/all-tpm*"
     
     input:
@@ -154,7 +156,7 @@ process THRESHOLD {
 
 // Cluster network
 process CLUSTER {
-    label 'big_mem_retry'
+    label 'retry'
     publishDir "results", pattern: "*/all-tpm*"
     
     input:
@@ -229,7 +231,6 @@ process MCLTOGRAPH {
     ${dir}/\${cluster_base}.edges.tsv \
     $go_annotation_file
 
-    module load R/$params.RVersion
     Rscript ${params.ScriptDir}/run-GBA-network.R \
     --auc_file ${dir}/\${cluster_base}.zfa.auc.tsv \
     --scores_file ${dir}/\${cluster_base}.zfa.gene-scores.tsv \
