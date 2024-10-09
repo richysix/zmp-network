@@ -6,7 +6,7 @@ editor: source
 
 ## Processes
 
-{{< include _dag-20240923.md >}}
+{{< include _dag-current.md >}}
 
 ### SUBSET (big_mem_retry)
 
@@ -93,6 +93,8 @@ Inputs:
 Outputs:
 
 1. Dir name: name of experiment
+
+1. Threshold
 
 1. Tuple of MCI files: MCL network files pruned using correlation and/or 
 knn threshold. These are flattened so that the next process receives the
