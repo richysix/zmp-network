@@ -9,6 +9,7 @@ log.info """\
   Expt to sample file: ${params.expts}
   All counts file: ${params.all_counts}
   Threshold params: ${params.threshold}
+  KNN params: ${params.knn}
   Inflation Params: ${params.inflationParams}
 """
 
@@ -90,7 +91,7 @@ process TEST_PARAMETERS {
     """
     module load MCL/$params.mclVersion
     
-    mkdir $dir
+    mkdir -p $dir
     mcxarray -data $tpms_file -co 0.2 \
     $params.skipRows $params.skipCols -tf 'abs()' \
     $params.corMeasure $params.labels -o $dir/all-tpm-20.mci
@@ -106,51 +107,54 @@ process TEST_PARAMETERS {
 }
 
 // Threshold
-process THRESHOLD {
+process FILTER_COR {
     label 'retry'
     publishDir "results", pattern: "*/all-tpm*"
     
     input:
     tuple val(dir), path(mci_file)
+    each threshold
 
     output:
-    tuple val(dir), path("$dir/*-[kt][0-9]*.mci"),
+    tuple val(dir), path("$dir/*-[t][0-9]*.mci"),
         path("$dir/*stats.tsv")
 
     script:
-    Integer suffix = params.threshold * 100
+    Integer suffix = threshold * 100
     outputBase = [dir, "/all-tpm"].join('')
     thresholdBase = [outputBase, "t$suffix"].join("-")
-    knnBase = [outputBase, 't20', "k$params.knn"].join("-")
-    knnThresholdBase = [outputBase, "t$suffix", "k$params.knn"].join("-")
     """
     module load MCL/$params.mclVersion
 
-    mkdir $dir
-    threshold='${params.threshold}'
-    if [[ ! -z \$threshold ]]; then
-        mcx alter -imx ${mci_file} -tf \
-        "gq($params.threshold), add(-$params.threshold)" \
-        -o ${thresholdBase}.mci
-    fi
-    knn='${params.knn}'
-    if [[ ! -z \$knn ]]; then
-        mcx alter -imx ${mci_file} -tf "add(-0.2), #knn($params.knn)" \
-        -o ${knnBase}.mci
-    fi
+    mkdir -p $dir
+    mcx alter -imx ${mci_file} -tf \
+    "gq(${threshold}), add(-${threshold})" \
+    -o ${thresholdBase}.mci
+    mcx query -imx ${thresholdBase}.mci > ${thresholdBase}.stats.tsv
+    """
+}
 
-    module load datamash
-    if [[ ! -z \$knn && ! -z \$threshold ]]; then
-        mcx alter -imx ${mci_file} \
-        -tf "gq($params.threshold), add(-$params.threshold), #knn($params.knn)" \
-        -o ${knnThresholdBase}.mci
-        mcx query -imx ${knnThresholdBase}.mci > ${knnThresholdBase}.stats.tsv
-        # Summarise stats
-        paste <( datamash -s groupby 2 count 2 < ${knnThresholdBase}.stats.tsv | awk '{ if(\$1 == 1){ print \$2 } }' ) \
-            <( datamash --header-in --round 1 mean degree median degree iqr degree < ${knnThresholdBase}.stats.tsv ) | \
-        awk -F"\t" 'BEGIN{ OFS = "\t" } {if(\$1 == ""){ print "0", \$2, \$3, \$4 } else{ print \$0 }}' | \
-        cat <( echo -e "S\tDmean\tDmedian\tDiqr" ) - > ${knnThresholdBase}.cor-knn-stats.tsv
-    fi
+process FILTER_KNN {
+    label 'retry'
+    publishDir "results", pattern: "*/all-tpm*"
+
+    input:
+    tuple val(dir), path(mci_file)
+    each knn_threshold
+
+    output:
+    tuple val(dir), path("$dir/*-[k][0-9]*.mci"),
+        path("$dir/*stats.tsv")
+
+    script:
+    """
+    module load MCL/$params.mclVersion
+
+    mkdir -p $dir
+    knnBase=${dir}/all-tpm-t20-k${knn_threshold}
+    mcx alter -imx ${mci_file} -tf "add(-0.2), #knn($knn_threshold)" \
+    -o \${knnBase}.mci
+    mcx query -imx \${knnBase}.mci > \${knnBase}.stats.tsv
     """
 }
 
@@ -160,13 +164,12 @@ process CLUSTER {
     publishDir "results", pattern: "*/all-tpm*"
     
     input:
-    tuple val(dir), val(threshold), path(mci_file)
+    tuple val(dir), path(mci_file), path(stats_file)
     each inflation
 
     output:
-    tuple val(dir), val(threshold), val(inflation), path(mci_file),
-        path("*/*.mci.I[0-9][0-9]"), path("*/*.mci.I[0-9][0-9].stats.tsv"), 
-        path("*/*.mci.I[0-9][0-9].cl*")
+    tuple val(dir), path(mci_file), path("*/*.mci.I[0-9][0-9]"),
+        path("*/*.mci.I[0-9][0-9].stats.tsv"), path("*/*.mci.I[0-9][0-9].cl*")
 
     script:
     Integer inflationSuffix = inflation * 10
@@ -187,32 +190,31 @@ process CLUSTER {
     """
 }
 
-process MCLTOGRAPH {
+process GBA {
     label 'huge_mem_retry'
     publishDir "results", pattern: "*/all-tpm*.{graphml,tsv,csv,pdf}"
 
     input:
-    tuple val(dir), path(tab_file), val(threshold), val(inflation), 
-        path(mci_file), path(cluster_file)
+    tuple val(dir), path(tab_file), path(mci_file), path(cluster_file)
     path(annotation_file)
     path(go_annotation_file)
     path(zfa_annotation_file)
 
     output:
-    tuple val(dir), val(threshold), val(inflation),
-        path(cluster_file), path("*/all-tpm*.graphml"),
+    tuple val(dir), path(cluster_file), path("*/all-tpm*.graphml"),
         path("*/all-tpm*.nodes.tsv"), path("*/all-tpm*.edges.tsv"),
         path("*/all-tpm*.auc.tsv"), path("*/all-tpm*.gene-scores.tsv"),
         path("*/all-tpm*.GBA-plots.pdf")
 
     script:
-    matches = (threshold =~ /^(t?)(\d*)-?(k?)(\d*)$/)
+    matches = (mci_file =~ /all-tpm-(t?)(\d*)-?(k?)(\d*).mci$/)
     t_num = get_threshold(matches)
+    println t_num
     """
     mkdir -p ${dir}
-    # run mcl2nodes script
     cluster_base=\$( basename $cluster_file )
     
+    # run convert_mcl script
     module load Python/$params.PythonVersion
     python ${params.ScriptDir}/convert_mcl.py \
     --min_cluster_size 4 --graph_id \${cluster_base} \
@@ -227,6 +229,7 @@ process MCLTOGRAPH {
     --auc_file ${dir}/\${cluster_base}.go.auc.tsv \
     --scores_file ${dir}/\${cluster_base}.go.gene-scores.tsv \
     --plots_file ${dir}/\${cluster_base}.go.GBA-plots.pdf \
+    --min.term.size $params.minTermSize --max.term.size $params.maxTermSize \
     ${dir}/\${cluster_base}.nodes.tsv \
     ${dir}/\${cluster_base}.edges.tsv \
     $go_annotation_file
@@ -235,6 +238,7 @@ process MCLTOGRAPH {
     --auc_file ${dir}/\${cluster_base}.zfa.auc.tsv \
     --scores_file ${dir}/\${cluster_base}.zfa.gene-scores.tsv \
     --plots_file ${dir}/\${cluster_base}.zfa.GBA-plots.pdf \
+    --min.term.size $params.minTermSize --max.term.size $params.maxTermSize \
     ${dir}/\${cluster_base}.nodes.tsv \
     ${dir}/\${cluster_base}.edges.tsv \
     $zfa_annotation_file
@@ -242,7 +246,7 @@ process MCLTOGRAPH {
 }
 
 process ENRICHMENT {
-    label 'local'
+    label 'retry'
     publishDir "results", pattern: "*/all-tpm*go*"
 
     input:
@@ -253,7 +257,7 @@ process ENRICHMENT {
 
     script:
     """
-    mkdir ${dir}
+    mkdir -p ${dir}
     # run go enrichment script
     cluster_base=\$( basename $cluster_file )
     
@@ -262,7 +266,7 @@ process ENRICHMENT {
     --min_cluster_size ${params.goMinClusterSize} \
     --output_file ${dir}/\${cluster_base}.go-enrichments.tsv \
     --rds_file ${dir}/\${cluster_base}.go-enrichments.rds \
-    $nodes_file 2> ${dir}/\${cluster_base}.go.err
+    $nodes_file
     """
 }
 
@@ -282,35 +286,45 @@ workflow {
         .map { [it[0], it[1]] }
         .view()
 
+    if (params.threshold) {
+        threshold_params_ch = channel.value(params.threshold)
+        filter_cor_ch = FILTER_COR(test_params_ch, threshold_params_ch)
+            .view()
+    }
+
+    if (params.knn) {
+        knn_params_ch = channel.value(params.knn)
+        filter_knn_ch = FILTER_KNN(test_params_ch, knn_params_ch)
+            .view()
+    }
+
     if (params.clustering) {
-        threshold_ch = THRESHOLD(test_params_ch)
-            .flatMap { dir = it[0]
-                mci_with_id = []
-                for (mci_file in it[1]) {
-                    matches = (mci_file =~ /^.*\/all-tpm-(t?\d*-?k?\d*).mci/)
-                    mci_with_id.add([dir, matches[0][1], mci_file])
-                }
-                return(mci_with_id)
-            }
-            .view()
 
+        if (params.threshold && params.knn) {
+            filtered_ch = filter_cor_ch.concat(filter_knn_ch)
+                .view()
+        } else if (params.threshold) {
+            filtered_ch = filter_cor_ch
+        } else {
+            filtered_ch = filter_knn_ch
+        }
         infl_values_ch = channel.value(params.inflationParams)
-        cluster_ch = CLUSTER(threshold_ch, infl_values_ch)
+        cluster_ch = CLUSTER(filtered_ch, infl_values_ch)
             .view()
 
-        mcl2graph_ch = orig_ch.cross(cluster_ch)
-            .map { [it[0][0], it[0][2], it[1][1], it[1][2], it[1][3], it[1][4] ] }
+        mci_ch = orig_ch.cross(cluster_ch)
+            .map { [it[0][0], it[0][2], it[1][1], it[1][2] ] }
             .view()
         
         annotation_ch = channel.value(params.AnnotationFile)
         go_annotation_ch = channel.value(params.GOFile)
         zfa_annotation_ch = channel.value(params.ZFAFile)
-        graph_ch = MCLTOGRAPH(
-            mcl2graph_ch, annotation_ch, go_annotation_ch, zfa_annotation_ch)
+        gba_ch = GBA(mci_ch, annotation_ch, go_annotation_ch,
+                       zfa_annotation_ch)
             .view()
 
-        nodes_ch = graph_ch
-            .map( { [it[0], it[3], it[5]] } )
+        nodes_ch = gba_ch
+            .map( { [it[0], it[1], it[3]] } )
         enrich_ch = ENRICHMENT(nodes_ch)
             .view()
     }
