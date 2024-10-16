@@ -40,7 +40,7 @@ for (package in packages) {
     suppressPackageStartupMessages( suppressWarnings( library(package, character.only = TRUE) ) )
 }
 
-show_cols <- debug
+show_cols <- cmd_line_args$options$debug
 
 # load data
 # nodes
@@ -74,14 +74,19 @@ gene_id2term_id <- annotation |>
   dplyr::select(GeneID, TermID) |> 
   as.matrix()
 annotations <- make_annotations(gene_id2term_id, nodes$gene_id, annotation$TermID)
-annotations <- filter_network_cols(annotations,
-                                   cmd_line_args$options$min.term.size,
-                                   cmd_line_args$options$max.term.size)
+annotations <- filter_network_cols(
+  annotations,
+  min = cmd_line_args$options$min.term.size,
+  max = cmd_line_args$options$max.term.size
+)
 
 # run GBA
-Anno_groups_voted <- run_GBA(network, annotations, 
-                           min = cmd_line_args$options$min.term.size,
-                           max = cmd_line_args$options$max.term.size)
+Anno_groups_voted <- run_GBA(
+  network,
+  annotations,
+  min = cmd_line_args$options$min.term.size,
+  max = cmd_line_args$options$max.term.size
+)
 
 auc_Anno_nv <- Anno_groups_voted[[1]][,1]
 Anno_multifunc_assessment <- calculate_multifunc(annotations)
