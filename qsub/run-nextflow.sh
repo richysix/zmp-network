@@ -20,11 +20,13 @@ OPTIONS="Options:
 # default values
 debug=0
 NEXTFLOW_VERSION="23.10.1"
+OPTIONS=""
 PARAMS=""
 RESUME=""
-while getopts ":n:p:r:dh" opt; do
+while getopts ":n:p:o:r:dh" opt; do
   case $opt in
     n)  NEXTFLOW_VERSION=$OPTARG  ;;
+    o)  OPTIONS=$OPTARG ;;
     p)  PARAMS=$OPTARG ;;
     r)  RESUME=$OPTARG ;;
     d)  debug=1 ;;
@@ -52,7 +54,7 @@ else
   SCRIPT=$1
 fi
 
-CMD="nextflow run $PARAMS $RESUME $SCRIPT"
+CMD="nextflow run $SCRIPT $OPTIONS $RESUME $PARAMS"
 if [[ $debug -gt 0 ]]; then
   echo $CMD >&2
 fi
