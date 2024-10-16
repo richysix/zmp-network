@@ -72,9 +72,14 @@ def main(args):
     }).write_csv(cl_size_fn, separator = "\t")
 
     # plot histogram of cluster sizes
-    hist = sns.displot(df, x="cluster_size", binwidth = 10)
     cl_hist_fn = args.input_file + ".clusters.hist.png"
-    hist.savefig(cl_hist_fn)
+    try:
+        hist = sns.displot(df, x="cluster_size", binwidth = 10)
+        hist.savefig(cl_hist_fn)
+    except ValueError:
+        print("There was a problem with the cluster size",
+            f"histogram, {cl_hist_fn}", file = sys.stderr)
+        
 
     # plot histogram with singletons removed
     # displot throws an error if there is only one value
@@ -85,7 +90,11 @@ def main(args):
         cl_hist_fn = args.input_file + ".clusters.hist.pdf"
         with PdfPages(cl_hist_fn) as pdf_pages:
             for bin_w in [10, 1]:
-                hist = sns.displot(no_singletons, x="cluster_size", binwidth = bin_w)
+                try:
+                    hist = sns.displot(no_singletons, x="cluster_size", binwidth = bin_w)
+                except ValueError:
+                    print("There was a problem with the no singletons",
+                        f"histogram using binwidth: {bin_w}")
                 pdf_pages.savefig()
 
 if __name__ == '__main__':
