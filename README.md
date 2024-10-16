@@ -405,14 +405,17 @@ Create a mermaid diagram of the pipeline that can be included in the README.
 ```
 qlogin
 module load nextflow
+cd $SCRATCH/zmp-network/nf
+mkdir reports
+today=$(date +%Y%m%d)
 nextflow run --expts /data/scratch/bty114/detct/grcz11/expt-sample-condition-tfap2.tsv \
---knn 240 --threshold 0.44 --clustering true -preview -with-dag dag-20240923.mmd \
+--knn 240 --threshold 0.44 --clustering true -preview -with-dag reports/dag-$today.mmd \
 -resume scripts/main.nf
 
 # with report
 nextflow run --expts /data/scratch/bty114/detct/grcz11/expt-sample-condition-tfap2.tsv \
---knn 240 --threshold 0.44 --clustering true -preview -with-dag dag-20240923.mmd \
--with-report zmp-network-nf-main.html -with-timeline zmp-network-nf-timeline.html
+--knn 240 --threshold 0.44 --clustering true -preview -with-dag reports/dag-20240923.mmd \
+-with-report reports/zmp-network-nf-main.html -with-timeline reports/zmp-network-nf-timeline.html
 -resume scripts/main.nf
 # if rerunning, either delete zmp-network-nf-main.html and zmp-network-nf-timeline.html
 # or enable report.overwrite option in config
@@ -420,7 +423,6 @@ nextflow run --expts /data/scratch/bty114/detct/grcz11/expt-sample-condition-tfa
 
 ### Rerun with dag and report
 ```
-mkdir reports
 today=$(date +%Y%m%d)
 qsub qsub/run-nextflow.sh \
 -p "--expts /data/scratch/bty114/detct/grcz11/expt-sample-condition-tfap2.tsv --knn 240 --threshold 0.44 --clustering true -with-dag reports/dag-$today.mmd -with-report reports/zmp-network-nf-main-$today.html -with-timeline reports/zmp-network-nf-timeline-$today.html" \
@@ -432,7 +434,181 @@ qsub qsub/run-nextflow.sh \
 Created a Quarto document to create the README detailing the processes in the pipeline. 
 Create markdown file from the mermaid diagram for including the README.
 ```
+today=$(date +%Y%m%d)
 cat <( echo "\`\`\`mermaid" ) \
-dag-20240923.mmd \
-<( echo "\`\`\`" ) > $gitdir/scripts/_dag-20240923.md
+reports/dag-$today.mmd \
+<( echo "\`\`\`" ) > $gitdir/scripts/_dag-current.md
+```
+
+### Test different thresholds effect on GO enrichment
+
+```bash
+qlogin
+cd /data/scratch/bty114/zmp-network/nf/work/72/887a1c5de895b673b79f970ec0f2e6
+module load MCL/14-137
+mci_file=all-tpm-20.mci
+dir=expt-zmp_ph192
+for threshold in 0.5 0.6 0.7 0.8 0.9
+do
+  suffix=$( perl -le "{ print $threshold * 100 }" )
+  thresholdBase="$dir/all-tpm-t$suffix"
+  mcx alter -imx ${mci_file} -tf \
+    "gq(${threshold}), add(-${threshold})" \
+    -o ${thresholdBase}.mci
+  mcx query -imx ${thresholdBase}.mci > ${thresholdBase}.stats.tsv
+done
+
+# cluster each one with lowest inflation value
+inflation=1.4
+inflationSuffix=14
+for threshold in 0.5 0.6 0.7 0.8 0.9
+do
+  suffix=$( perl -le "{ print $threshold * 100 }" )
+  thresholdBase="$dir/all-tpm-t$suffix"
+  mci_file=${thresholdBase}.mci
+  mcl $mci_file -I $inflation -o ${mci_file}.I${inflationSuffix}
+done
+
+module load Python/3.12.4
+tab_file=/data/scratch/bty114/zmp-network/nf/results/expt-zmp_ph192/all-tpm.tab
+annotation_file=/data/scratch/bty114/detct/grcz11/reference/Dr-e92-annotation.txt 
+for threshold in 0.5 0.6 0.7 0.8 0.9
+do
+  suffix=$( perl -le "{ print $threshold * 100 }" )
+  thresholdBase="$dir/all-tpm-t$suffix"
+  mci_file=${thresholdBase}.mci
+  cluster_file=${mci_file}.I${inflationSuffix}
+  cluster_base=$( basename $cluster_file )
+
+  python ${gitdir}/scripts/convert_mcl.py \
+--min_cluster_size 4 --graph_id ${cluster_base} \
+--nodes_file ${dir}/${cluster_base}.nodes.tsv \
+--edges_file ${dir}/${cluster_base}.edges.tsv \
+--edge_offset ${threshold} \
+$mci_file $cluster_file $tab_file $annotation_file
+done
+
+# Run GBA
+qsub $gitdir/qsub/run-GBA.sh
+
+module load datamash/1.5
+for file in expt-zmp_ph192/all-tpm-t[0-9][0-9].mci.I14.go.auc.tsv
+do echo -n "$file "
+datamash --header-in mean 2 mean 4 < $file
+zfa_file=$( echo $file | sed -e 's|go|zfa|' )
+echo -n "$zfa_file "
+datamash --header-in mean 2 mean 4 < $zfa_file
+done | sort -k1.36,1.38
+expt-zmp_ph192/all-tpm-t50.mci.I14.go.auc.tsv 0.5342999579048   0.53061049803388
+expt-zmp_ph192/all-tpm-t60.mci.I14.go.auc.tsv 0.53394106524957  0.5232557758945
+expt-zmp_ph192/all-tpm-t70.mci.I14.go.auc.tsv 0.53402257881198  0.51293172740254
+expt-zmp_ph192/all-tpm-t80.mci.I14.go.auc.tsv 0.5363621100721   0.48506519884509
+expt-zmp_ph192/all-tpm-t90.mci.I14.go.auc.tsv 0.53970784934143  0.522001939447
+expt-zmp_ph192/all-tpm-t50.mci.I14.zfa.auc.tsv 0.55290938001188 0.55079021575828
+expt-zmp_ph192/all-tpm-t60.mci.I14.zfa.auc.tsv 0.55108514396258 0.54324413045117
+expt-zmp_ph192/all-tpm-t70.mci.I14.zfa.auc.tsv 0.56086544018161 0.53010743859729
+expt-zmp_ph192/all-tpm-t80.mci.I14.zfa.auc.tsv 0.57414829893933 0.50575074120105
+expt-zmp_ph192/all-tpm-t90.mci.I14.zfa.auc.tsv 0.59724296439062 0.56848400263962
+
+cd /data/scratch/bty114/zmp-network/nf/results/expt-zmp_ph192/
+for file in *.go.auc.tsv
+do echo -n "$file "
+datamash --header-in mean 2 mean 4 < $file
+done
+all-tpm-t20-k240.mci.I14.go.auc.tsv 0.52385582225004    0.4720705753021
+all-tpm-t20-k240.mci.I20.go.auc.tsv 0.53278224305905    0.48778126810195
+all-tpm-t20-k240.mci.I40.go.auc.tsv 0.52698166939694    0.49042056604816
+all-tpm-t44-k240.mci.I14.go.auc.tsv 0.52370670419183    0.50791828242453
+all-tpm-t44-k240.mci.I20.go.auc.tsv 0.52523939844065    0.507398578215
+all-tpm-t44-k240.mci.I40.go.auc.tsv 0.52637475067694    0.50552012236055
+all-tpm-t44.mci.I14.go.auc.tsv 0.54335982867671 0.5400352720999
+all-tpm-t44.mci.I20.go.auc.tsv 0.54433722174289 0.54164264710159
+all-tpm-t44.mci.I40.go.auc.tsv 0.55457281114976 0.55079479838103
+```
+
+Also try changing knn threshold
+```bash
+qlogin
+cd /data/scratch/bty114/zmp-network/nf/work/72/887a1c5de895b673b79f970ec0f2e6
+module load MCL/14-137
+mci_file=all-tpm-20.mci
+dir=expt-zmp_ph192
+for knn in 120 140 160 180 200
+do
+  knnBase="$dir/all-tpm-t20-k${knn}"
+  mcx alter -imx ${mci_file} -tf "add(-0.2), #knn($knn)" \
+-o ${knnBase}.mci
+done
+
+# cluster each one with lowest inflation value
+inflation=1.4
+inflationSuffix=14
+for knn in 120 140 160 180 200
+do
+  knnBase="$dir/all-tpm-t20-k${knn}"
+  mcl $knnBase.mci -I $inflation -o $knnBase.mci.I${inflationSuffix}
+done
+
+module load Python/3.12.4
+tab_file=/data/scratch/bty114/zmp-network/nf/results/expt-zmp_ph192/all-tpm.tab
+annotation_file=/data/scratch/bty114/detct/grcz11/reference/Dr-e92-annotation.txt 
+for knn in 120 140 160 180 200
+do
+  knnBase="$dir/all-tpm-t20-k${knn}"
+  cluster_file=$knnBase.mci.I${inflationSuffix}
+  cluster_base=$( basename $cluster_file )
+  python ${gitdir}/scripts/convert_mcl.py \
+--min_cluster_size 4 --graph_id ${cluster_base} \
+--nodes_file ${dir}/${cluster_base}.nodes.tsv \
+--edges_file ${dir}/${cluster_base}.edges.tsv \
+--edge_offset 0.2 \
+$knnBase.mci $cluster_file $tab_file $annotation_file
+done
+
+# Run GBA
+cd expt-zmp_ph192/
+qsub $gitdir/qsub/run-GBA.sh all-tpm-t20-k*.mci.I14.nodes.tsv
+
+module load datamash/1.5
+for file in  expt-zmp_ph192/all-tpm-t*k*.mci.I14.go.auc.tsv
+do echo -n "$file "
+datamash --header-in mean 2 mean 4 < $file
+done
+expt-zmp_ph192/all-tpm-t20-k120.mci.I14.go.auc.tsv 0.51677631566207     0.47159096823972
+expt-zmp_ph192/all-tpm-t20-k140.mci.I14.go.auc.tsv 0.51821553010188     0.47042455024057
+expt-zmp_ph192/all-tpm-t20-k160.mci.I14.go.auc.tsv 0.51950613761639     0.47010182851856
+expt-zmp_ph192/all-tpm-t20-k180.mci.I14.go.auc.tsv 0.52064411389366     0.46972165940266
+expt-zmp_ph192/all-tpm-t20-k200.mci.I14.go.auc.tsv 0.52106607916691     0.46993211865578
+expt-zmp_ph192/all-tpm-t20-k120.mci.I14.zfa.auc.tsv 0.5205292472539     0.47113507046674
+expt-zmp_ph192/all-tpm-t20-k140.mci.I14.zfa.auc.tsv 0.52243140512828    0.4704706281534
+expt-zmp_ph192/all-tpm-t20-k160.mci.I14.zfa.auc.tsv 0.52492263355333    0.47036431445324
+expt-zmp_ph192/all-tpm-t20-k180.mci.I14.zfa.auc.tsv 0.5262556931653     0.47022882271109
+expt-zmp_ph192/all-tpm-t20-k200.mci.I14.zfa.auc.tsv 0.5274561611325     0.47040260013697
+```
+
+Run Gprofiler on clusters
+```bash
+$gitdir/scripts/gprofiler-on-network-clusters.R
+```
+
+Change the pipeline to make THRESHOLD 2 separate processes, FILTER_COR and FILTER_KNN
+```
+# thresholds as specified in nextflow.config
+# params.threshold = [0.6, 0.7, 0.8, 0.9]
+# params.knn = [240, 200, 160, 120, 80]
+today=$(date +%Y%m%d-%H%M)
+params="-with-dag reports/dag-$today.mmd \
+-with-report reports/zmp-network-nf-main-$today.html \
+-with-timeline reports/zmp-network-nf-timeline-$today.html"
+options="--expts /data/scratch/bty114/detct/grcz11/expt-sample-condition-tfap2.tsv \
+--clustering true"
+qsub qsub/run-nextflow.sh -d -o "$options" -p "$params" -r current scripts/main.nf
+
+# or with no reports
+qsub qsub/run-nextflow.sh -d -o "$options" -r current scripts/main.nf
+
+```
+
+Need a file of all genes in the network and one for each cluster
+```bash
 ```
