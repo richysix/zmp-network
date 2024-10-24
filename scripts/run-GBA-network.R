@@ -69,7 +69,11 @@ assort <- assortativity(network)
 nd <- node_degree(network)
 
 # annotation
-annotation <- read_tsv(cmd_line_args$args[3], show_col_types = show_cols)
+annotation <- read_tsv(
+  cmd_line_args$args[3], 
+  col_names = c("GeneID", "TermID", "Domain"),
+  show_col_types = show_cols
+)
 gene_id2term_id <- annotation |> 
   dplyr::select(GeneID, TermID) |> 
   as.matrix()

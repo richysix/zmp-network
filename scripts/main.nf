@@ -245,28 +245,63 @@ process GBA {
     """
 }
 
+// process ANNOTATION {
+//     label 'retry'
+//     publishDir "reference", pattern: "*"
+
+//     input:
+//     tuple val(go_url)
+
+//     output:
+//     tuple path(go_annotation)
+
+//     script:
+//     """
+//     wget $params.GO_URL
+//     """
+// }
+
 process ENRICHMENT {
     label 'retry'
-    publishDir "results", pattern: "*/all-tpm*go*"
+    publishDir "results", pattern: "*/GO/*"
 
     input:
     tuple val(dir), path(cluster_file), path(nodes_file)
+    path(go_annotation_file)
 
     output:
-    tuple val(dir), path(nodes_file), path("*/all-tpm*go*")
+    tuple val(dir), path(nodes_file), path("*/GO/*")
 
     script:
     """
-    mkdir -p ${dir}
+    mkdir -p ${dir}/GO
     # run go enrichment script
     cluster_base=\$( basename $cluster_file )
     
-    module load R/$params.RVersion
-    Rscript ${params.ScriptDir}/gprofiler-on-network-clusters.R \
-    --min_cluster_size ${params.goMinClusterSize} \
-    --output_file ${dir}/\${cluster_base}.go-enrichments.tsv \
-    --rds_file ${dir}/\${cluster_base}.go-enrichments.rds \
-    $nodes_file
+    module load Python/$params.PythonVersion
+    python ${params.ScriptDir}/create_files_for_topgo.py \
+    --min_cluster_size $params.goMinClusterSize \
+    $nodes_file \$cluster_base
+
+    if [[ \$( find ./ -type f -name "\${cluster_base}.cluster-*" | wc -l ) -eq 0 ]] ; then
+        echo "No clusters to test!"
+        echo "No clusters to test!" > ${dir}/GO/done.txt
+    else
+        module load R/$params.RVersion
+        module load topgo-wrapper/$params.EnsemblVersion
+        for file in \${cluster_base}.cluster-*
+        do
+            cluster_out=\$( basename -s '.tsv' \$file )
+            echo \$cluster_out
+            run_topgo.pl --input_file \${cluster_base}.all.tsv \
+            --genes_of_interest_file \$file \
+            --dir ${dir}/GO/\$cluster_out \
+            --gene_field 3 \
+            --name_field 4 \
+            --description_field 5 \
+            --go_terms_file $go_annotation_file
+        done
+    fi
     """
 }
 
@@ -325,7 +360,6 @@ workflow {
 
         nodes_ch = gba_ch
             .map( { [it[0], it[1], it[3]] } )
-        enrich_ch = ENRICHMENT(nodes_ch)
-            .view()
+        enrich_ch = ENRICHMENT(nodes_ch, go_annotation_ch)
     }
 }
