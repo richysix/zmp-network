@@ -11,7 +11,7 @@ module load rclone/1.65.2
 
 dir=zmp-network/nf/results
 echo "Starting $dir backup 1" 1>&2
-rclone copy /data/scratch/bty114/$dir/ sharepoint-qmul-buschlab:Projects/$dir/ \
+rclone copy $SCRATCH/$dir/ sharepoint-qmul-buschlab:Projects/$dir/ \
  --include "*.{doc,docx,xls,xlsx,xlsm,ppt,pptx,html,png}" \
  --ignore-size --ignore-checksum --drive-acknowledge-abuse --update --copy-links
 
