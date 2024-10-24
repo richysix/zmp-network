@@ -3,7 +3,7 @@
 #$ -cwd
 #$ -pe smp 1
 #$ -l h_rt=240:0:0
-#$ -l h_vmem=1G
+#$ -l h_vmem=8G
 
 source bash_functions.sh
 
