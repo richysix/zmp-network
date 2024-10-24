@@ -703,3 +703,16 @@ Print out definitions for columns in cor/knn stats
 k-NN     The knn parameter
 ```
 
+Back up results directory to sharepoint (sharepoint-qmul-buschlab:Projects/zmp-network)
+```bash
+qsub nf/qsub/backup.sh
+```
+
+Also record the original positions of the files (symlinks)
+```bash
+find results/ -type l | xargs ls -lh | awk '{print $9, $11}' > results-symlinks.txt
+```
+
+## TO DO
+Write a script to restore the results and work directories so that it can be
+resumed without rerunning all the jobs
