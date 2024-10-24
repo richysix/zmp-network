@@ -11,6 +11,8 @@ editor_options:
 library(tidyverse)
 library(patchwork)
 library(rprojroot)
+library(nanoparquet)
+library(feather)
 ```
 
 ```{r setup}
@@ -23,7 +25,41 @@ if (!dir.exists(plot_dir)) {
 ```
 
 ```{r cor_dist}
+pqt_file <- "/data/scratch/bty114/zmp-network/nf/work/84/44dbe8bdbe5bf0d13af63aa8034ab6/expt-zmp_ph192/all-tpm-orig.mat.parquet"
+if (file.exists(pqt_file)) {
+  cor_data <- read_parquet(pqt_file)
+} else {
+  cor_data <- read_csv("/data/scratch/bty114/zmp-network/nf/work/84/44dbe8bdbe5bf0d13af63aa8034ab6/expt-zmp_ph192/all-tpm-orig.mat.csv",
+                       show_col_types = FALSE)
+  names(cor_data)[1] <- "GeneID1"
+  write_parquet(cor_data, pqt_file)
+}
 
+cor_data_long <- cor_data |>
+  pivot_longer(cols = -GeneID1, names_to = "GeneID2", values_to = "cor") |>
+  filter(cor != 1) |> 
+  mutate(decile = cut(cor, breaks = seq(-1, 1, 0.1)),
+         percentile = cut(cor, breaks = seq(-1, 1, 0.01)))
+write_feather(cor_data_long, "/data/scratch/bty114/zmp-network/nf/work/84/44dbe8bdbe5bf0d13af63aa8034ab6/expt-zmp_ph192/all-tpm-orig.mat-long.ftr")
+  
+decile_counts <- count(cor_data_long, decile) |> 
+  mutate(label = sub("^.*,", "", decile),
+         label = sub("]$", "", label))
+percentile_counts <- count(cor_data_long, percentile) |> 
+  mutate(label = sub("^.*,", "", percentile),
+         label = sub("]$", "", label))
+write_tsv(percentile_counts, file = "/data/scratch/bty114/zmp-network/nf/work/84/44dbe8bdbe5bf0d13af63aa8034ab6/expt-zmp_ph192/all-tpm-orig.cor.pc.tsv")
+
+png(filename = file.path(plot_dir, "expt-zmp_ph192-cor-dist.png"), 
+    width = 1200, height = 800, res = 100)
+ggplot(data = decile_counts) +
+  geom_col(aes(x = decile, y = n), fill = "steelblue3",
+           position = position_nudge(x = -0.5)) +
+  scale_x_discrete(labels = decile_counts$label) +
+  scale_y_log10() +
+  labs(x = "Correlation coefficient", y = "Count") +
+  theme_minimal()
+dev.off()
 ```
 
 ```{r load_func}

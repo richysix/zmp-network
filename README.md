@@ -719,15 +719,37 @@ resumed without rerunning all the jobs
 
 Test getting MCL to output a mtrix of all the correlation values
 ```bash
-base=all-tpm-orig
-mcxdump -imx $base.mci -o - -tabc all-tpm.tab \
---dump-lines -digits 3 -sep-field "," -sep-lead "," 2> /dev/null | \
-sed -e 's|[0-9][0-9]*:||g' | \
-cat <( cut -f2 all-tpm.tab | awk 'BEGIN{ ORS="" }{ print $1 "," }' | \
-sed -e 's|,$|\n|; s|^|GeneID,|' ) - > $base.mat.csv
-
+cd /data/scratch/bty114/zmp-network/nf/work/84/44dbe8bdbe5bf0d13af63aa8034ab6
 mcxdump -imx expt-zmp_ph192/all-tpm-orig.mci \
 -tab expt-zmp_ph192/all-tpm.tab --dump-table \
 -digits 3 -sep-field "," -sep-lead "," \
 -o expt-zmp_ph192/all-tpm-orig.mat.csv
+```
+
+Run script to count up cor values for histogram
+```bash
+# perl
+cd /data/scratch/bty114/zmp-network/nf/work/84/44dbe8bdbe5bf0d13af63aa8034ab6/expt-zmp_ph192
+date; perl -F"," -lane 'BEGIN{ use POSIX; %pc_counts = (); } 
+{ next if $. == 1; foreach $item (@F){ 
+  next if $item =~ m/^ENSDARG/; 
+  $lower = floor($item*10)/10; 
+  $upper = ceil($item*10)/10; 
+  if($lower == $upper){ $lower = $upper - 0.1 } 
+  $pc_counts{"$lower:$upper"} += 1 } } 
+END{ foreach $key ( sort keys %pc_counts ){ 
+  print join("\t", $key, $pc_counts{$key} ) } } ' all-tpm-orig.mat.csv | \
+  sed -e 's|:|\t|' | sort -g -k1,2 > all-tpm-orig.cor-hist.txt; date 
+Thu Oct 24 16:52:36 BST 2024
+Thu Oct 24 17:10:33 BST 2024
+
+#python
+date; python ~/checkouts/zmp-network/scripts/cor-hist.py \
+all-tpm-orig.mat.csv > all-tpm-orig.cor-hist-py.tsv ; date
+Thu Oct 24 17:30:53 BST 2024
+Thu Oct 24 17:41:40 BST 2024
+
+# language 100 lines    all lines
+# perl     5"           17'57"
+# python   2"           10'47"
 ```
