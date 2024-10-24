@@ -1,0 +1,316 @@
+---
+title: "Analysis of edge filtering"
+output: html_document
+date: '2024-10-22'
+editor: source
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r packages}
+library(tidyverse)
+library(patchwork)
+library(rprojroot)
+```
+
+```{r setup}
+root <- rprojroot::is_rstudio_project
+results_dir <- root$find_file("nf/results")
+plot_dir <- root$find_file("plots")
+if (!dir.exists(plot_dir)) {
+  dir.create(plot_dir)
+}
+```
+
+```{r cor_dist}
+
+```
+
+```{r load_func}
+load_stats <- function(expt, file) {
+  filename <- file.path(results_dir, expt, file)
+  read_tsv(filename, show_col_types = FALSE) |> 
+    mutate(Expt = expt)
+}
+
+ # L       Percentage of nodes in the largest component
+ # D       Percentage of nodes in components of size at most 3 [-div option]
+ # R       Percentage of nodes not in L or D: 100 - L -D
+ # S       Percentage of nodes that are singletons
+ # E       Fraction of edges retained (input graph has 87883982)
+
+```
+
+```{r cor}
+#| label: cor-stats
+expt_names <- c("expt-zmp_ph192", "expt-zmp_ph238", "expt-zmp_ph250")
+inflation_values <- c("14", "20", "40")
+colour_palette <- biovisr::cbf_palette(c(expt_names, inflation_values),
+                                       named = TRUE)
+cor_stats <- map(expt_names, \(x) load_stats(x, "all-tpm.cor-stats.tsv")) |> 
+  list_rbind()
+
+singletons <- ggplot(data = cor_stats) +
+  geom_point(aes(x = Cutoff, y = S, colour = Expt)) +
+  scale_colour_manual(values = colour_palette) +
+  ylab("Singletons") +
+  theme_minimal()
+
+png(file.path(plot_dir, "cor-stats-singletons.png"), res = 100)
+print(singletons)
+dev.off()
+
+nodes <- ggplot(data = cor_stats) +
+  geom_point(aes(x = Cutoff, y = L, colour = Expt)) +
+  scale_colour_manual(values = colour_palette) +
+  ylab("Connected Nodes") +
+  theme_minimal()
+png(file.path(plot_dir, "cor-stats-nodes.png"), res = 100)
+print(nodes)
+dev.off()
+
+png(file.path(plot_dir, "cor-stats-nodes-singletons.png"), width = 960, res = 100)
+nodes + singletons + plot_layout(guides = 'collect')
+dev.off()
+print(nodes + singletons + plot_layout(guides = 'collect'))
+
+node_degrees <- ggplot(data = cor_stats) +
+  geom_hline(yintercept = 100, colour = "firebrick3", linetype = "dashed") +
+  geom_pointrange(aes(x = Cutoff, y = NDmed, ymin = NDmed - NDiqr/2, 
+                      ymax = NDmed + NDiqr/2, colour = Expt)) +
+  scale_colour_manual(values = colour_palette) +
+  theme_minimal()
+png(file.path(plot_dir, "cor-stats-node-degrees.png"), width = 960, res = 100)
+print(node_degrees)
+dev.off()
+
+print(node_degrees)
+```
+
+```{r}
+#| label: knn-stats
+knn_stats <- map(c("expt-zmp_ph192", "expt-zmp_ph238", "expt-zmp_ph250"),
+                 \(x) load_stats(x, "all-tpm.knn-stats.tsv")) |> 
+  list_rbind()
+
+singletons <- ggplot(data = knn_stats) +
+  geom_point(aes(x = kNN, y = S, colour = Expt)) +
+  scale_colour_manual(values = colour_palette) +
+  scale_x_reverse() +
+  ylab("Singletons") +
+  theme_minimal()
+png(file.path(plot_dir, "knn-stats-singletons.png"), res = 100)
+print(singletons)
+dev.off()
+
+nodes <- ggplot(data = knn_stats) +
+  geom_point(aes(x = kNN, y = L, colour = Expt)) +
+  scale_colour_manual(values = colour_palette) +
+  scale_x_reverse() +
+  ylab("Connected Nodes") +
+  theme_minimal()
+png(file.path(plot_dir, "knn-stats-nodes.png"), res = 100)
+print(nodes)
+dev.off()
+
+png(file.path(plot_dir, "knn-stats-nodes-singletons.png"), width = 960, res = 100)
+nodes + singletons + plot_layout(guides = 'collect')
+dev.off()
+
+knn_long <- knn_stats |> 
+  dplyr::select(L:S, kNN, Expt) |> 
+  pivot_longer(-c(Expt, kNN), names_to = "category", values_to = "nodes") |> 
+  mutate(category = factor(category, levels = c("L", "D", "S", "R")))
+
+categories <- c(
+    L = "Largest Component",
+    S = "Singletons",
+    R = "Remainder",
+    D = "Disconnected"
+)
+all_components <- ggplot(knn_long, aes(x = kNN, y = nodes, colour = Expt)) +
+  geom_point() +
+  facet_wrap(vars(category), nrow = 1, scales = "free_y",
+             labeller = labeller(category = categories)) +
+  scale_colour_manual(values = colour_palette) +
+  scale_x_reverse() +
+  theme_minimal()
+
+png(file.path(plot_dir, "knn-stats-all-components.png"), 
+    width = 960, height = 240, res = 100)
+print(all_components)
+dev.off()
+
+print(all_components)
+
+node_degrees <- ggplot(data = knn_stats) +
+  geom_hline(yintercept = 100, colour = "firebrick3", linetype = "dashed") +
+  geom_pointrange(aes(x = kNN, y = NDmed, ymin = NDmed - NDiqr/2, 
+                      ymax = NDmed + NDiqr/2, colour = Expt)) +
+  scale_colour_manual(values = colour_palette) +
+  scale_x_reverse() +
+  theme_minimal()
+png(file.path(plot_dir, "knn-stats-node-degrees.png"), width = 960, res = 100)
+print(node_degrees)
+dev.off()
+
+load_node_degrees <- function(expt, knn) {
+  filename <- file.path(results_dir, expt, 
+                        paste0("all-tpm-t20-k", knn, ".stats.tsv"))
+  read_tsv(filename, show_col_types = FALSE) |> 
+    mutate(Expt = expt, knn = knn)
+}
+
+params <- expand_grid(
+  Expt = expt_names,
+  knn = seq(80, 240, 40)
+)
+node_degree_data <- purrr::map2(params$Expt, params$knn, load_node_degrees) |>
+  list_rbind() |>
+  mutate(
+    knn = factor(knn, levels = seq(240, 80, -40)),
+    Expt = factor(Expt, levels = expt_names)
+  )
+
+median_by_expt_by_knn <- node_degree_data |> 
+  group_by(Expt, knn) |> 
+  summarise(
+    median_degree = median(degree),
+    .groups = "drop"
+  )
+strip_labels = list(
+  Expt = sub("expt-", "", expt_names)
+)
+names(strip_labels$Expt) <- expt_names
+
+node_degree_distribution <- ggplot(data = node_degree_data,
+       aes(x = degree, fill = Expt)) +
+  geom_histogram(binwidth = 10, boundary = 1, show.legend = FALSE) +
+  facet_grid(rows = vars(Expt), cols = vars(knn),
+             labeller = labeller(Expt = strip_labels$Expt,
+                                 knn = label_value)) +
+  geom_vline(data = median_by_expt_by_knn,
+             aes(xintercept = median_degree),
+             colour = "black") +
+  scale_fill_manual(values = colour_palette) +
+  theme_minimal()
+
+png(file.path(plot_dir, "knn-stats-node-degree-distribution.png"), 
+    width = 1200, height = 480, res = 100)
+print(node_degree_distribution)
+dev.off()
+
+```
+
+```{r}
+#| label: auc-results
+auc_data <- read_tsv(
+  file.path(results_dir, "auc-results.txt"),
+  col_names = c("Expt", "Params", "Domain", "AUC", "DegreeAUC", "Diff"),
+  show_col_types = FALSE
+) |> 
+  separate_wider_delim(cols = Params, delim = ".",
+                       names = c("Params", NA, "Inflation", NA, NA, NA)) |> 
+  mutate(Params = sub("all-tpm-", "", Params),
+         Params = factor(Params, levels = c("t20-k80", "t20-k120", "t20-k160",
+                                            "t20-k200", "t20-k240", "t44-k240",
+                                            "t44", "t60", "t70", "t80", "t90")),
+         Inflation = sub("^I", "", Inflation))
+
+```
+
+```{r}
+#| label: auc-plots
+auc_diff <- ggplot(data = auc_data) +
+  geom_col(aes(x = Params, y = Diff, fill = Inflation),
+             position = position_dodge()) +
+  facet_grid(rows = vars(Domain), cols = vars(Expt),
+             labeller = labeller(Expt = strip_labels$Expt,
+                                 Domain = \(x) toupper(x))) +
+  scale_fill_manual(values = colour_palette,
+                    labels = c("1.4", "2", "4")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+png(file.path(plot_dir, "auc-diff.png"), width = 1200, height = 480, res = 100)
+print(auc_diff)
+dev.off()
+
+print(auc_diff)
+```
+
+
+```{r cluster_dist}
+load_cluster_sizes <- function(expt, knn, inflation) {
+  filename <- 
+    file.path(
+      results_dir,
+      expt,
+      paste0("all-tpm-t20-k", knn, ".mci.I", inflation, ".cl-sizes.tsv" )
+    )
+  read_tsv(filename, show_col_types = FALSE) |> 
+    mutate(
+      Expt = expt,
+      knn = knn,
+      inflation = inflation
+    )
+}
+params <- expand_grid(
+  Expt = expt_names,
+  knn = seq(80, 240, 40),
+  inflation = c(14, 20, 40)
+)
+cl_size_data <- 
+  map(seq_len(nrow(params)),
+      \(x) load_cluster_sizes(params$Expt[x], params$knn[x], params$inflation[x]) ) |> 
+  list_rbind() |> 
+  mutate(knn = factor(knn, levels = seq(240, 80, -40)))
+
+cl_size_summary <- cl_size_data |> 
+  group_by(Expt, knn, inflation) |> 
+  summarise(
+    num_nodes = sum(cluster_size),
+    total_clusters = n(),
+    singleton_nodes = sum(cluster_size == 1),
+    non_singleton_nodes = sum(cluster_size[ cluster_size > 1]),
+    .groups = "drop") |> 
+  mutate(non_singleton_clusters = total_clusters - singleton_nodes) 
+
+num_clusters_plot <- cl_size_summary |> 
+  ggplot(aes(x = knn, y = non_singleton_clusters, fill = factor(inflation))) +
+  geom_col(position = position_dodge()) +
+  scale_fill_manual(values = colour_palette,
+                    name = "Inflation", 
+                    labels = c("1.4", "2", "4")) +
+  facet_wrap(vars(Expt),
+             labeller = labeller(Expt = strip_labels$Expt)) +
+  labs(y = "Number of clusters (excluding singletons") +
+  theme_minimal()
+
+png(file.path(plot_dir, paste0("knn-stats-cluster-sizes.png")),
+      width = 1200, height = 480, res = 100)
+print(num_clusters_plot)
+dev.off()
+
+total_nodes <- cl_size_summary$num_nodes[1]
+ten_pc_nodes <- ceiling(total_nodes/10)
+cluster_size_histogram <- function(df) {
+  df |> ggplot(aes(x = cluster_size)) +
+    geom_histogram(binwidth = 1, boundary = 1) +
+    geom_hline(yintercept = ten_pc_nodes, colour = "firebrick3") +
+    facet_grid(rows = vars(inflation), cols = vars(knn)) +
+    scale_x_log10(limits = c(0.1,NA)) +
+    scale_y_log10() +
+    theme_minimal()
+}
+cl_size_by_expt <- split(cl_size_data, cl_size_data$Expt)
+cl_size_hist_list <- map(cl_size_by_expt, cluster_size_histogram)
+
+for (expt in expt_names) {
+  png(file.path(plot_dir, paste0("knn-stats-cluster-sizes-", expt, ".png")),
+      width = 1200, height = 480, res = 100)
+  print(cl_size_hist_list[[expt]])
+  dev.off()
+}
+
+```

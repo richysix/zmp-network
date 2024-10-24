@@ -471,7 +471,7 @@ done
 
 module load Python/3.12.4
 tab_file=/data/scratch/bty114/zmp-network/nf/results/expt-zmp_ph192/all-tpm.tab
-annotation_file=/data/scratch/bty114/detct/grcz11/reference/Dr-e92-annotation.txt 
+annotation_file=/data/scratch/bty114/detct/grcz11/reference/Dr-e92-annotation.txt
 for threshold in 0.5 0.6 0.7 0.8 0.9
 do
   suffix=$( perl -le "{ print $threshold * 100 }" )
@@ -596,19 +596,110 @@ Change the pipeline to make THRESHOLD 2 separate processes, FILTER_COR and FILTE
 # thresholds as specified in nextflow.config
 # params.threshold = [0.6, 0.7, 0.8, 0.9]
 # params.knn = [240, 200, 160, 120, 80]
-today=$(date +%Y%m%d-%H%M)
-params="-with-dag reports/dag-$today.mmd \
--with-report reports/zmp-network-nf-main-$today.html \
--with-timeline reports/zmp-network-nf-timeline-$today.html"
+params="-with-dag -with-report -with-timeline"
 options="--expts /data/scratch/bty114/detct/grcz11/expt-sample-condition-tfap2.tsv \
 --clustering true"
-qsub qsub/run-nextflow.sh -d -o "$options" -p "$params" -r current scripts/main.nf
+qsub -m bea -M bty114@qmul.ac.uk qsub/run-nextflow.sh -d -o "$options" -p "$params" -r current scripts/main.nf
 
 # or with no reports
 qsub qsub/run-nextflow.sh -d -o "$options" -r current scripts/main.nf
-
 ```
 
-Need a file of all genes in the network and one for each cluster
 ```bash
+module load datamash/1.5
+for dir in $( find results/ -maxdepth 1 -mindepth 1 -type d )
+do
+  for domain in go zfa
+  do
+    for file in  $dir/*.$domain.auc.tsv
+    do 
+      echo -n $( basename $dir ) $( basename $file ) "$domain "
+      datamash --header-in mean 2 mean 4 < $file | 
+      awk '{ print $0, $1 - $2 }'
+    done
+  done
+done | sed -e 's|[[:space:]]|\t|g' > auc-results.txt
+
+for dir in $( find results/ -maxdepth 1 -mindepth 1 -type d )
+do
+  for domain in go zfa
+  do
+    for file in  $dir/*.$domain.auc.tsv
+    do 
+      echo -n $( basename $dir ) $( basename $file ) "$domain "
+      datamash --header-in mean 2 mean 4 < $file | 
+      awk '{ print $0, $1 - $2 }'
+    done
+  done
+done | sed -e 's|[[:space:]]|\t|g' > auc-results.txt
 ```
+
+Count number of clusters tested for GO enrichment
+```bash
+for knum in 80 120 160 200 240
+do
+  for inflation in 14 20 40
+  do
+    echo -n "$knum $inflation "
+    ls -d nf/results/expt-zmp_ph192/GO/all-tpm-t20-k${knum}.mci.I${inflation}.cluster-* | \
+    sed -e 's|nf/results/expt-zmp_ph192/GO/all-tpm-t20-k[0-9]*.mci.I[0-9]*.cluster-||' | sort -gr | head -n1
+done
+done
+80 14 113
+80 20 85
+80 40 48
+120 14 95
+120 20 91
+120 40 66
+160 14 87
+160 20 93
+160 40 70
+200 14 82
+200 20 94
+200 40 73
+240 14 81
+240 20 93
+240 40 73
+
+for inflation in 14 20 40
+do
+for knum in 80 120 160 200 240
+do
+    echo -n "$knum $inflation "
+    ls -d nf/results/expt-zmp_ph192/GO/all-tpm-t20-k${knum}.mci.I${inflation}.cluster-* | \
+    sed -e 's|nf/results/expt-zmp_ph192/GO/all-tpm-t20-k[0-9]*.mci.I[0-9]*.cluster-||' | sort -gr | head -n1
+done
+done
+80 14 113
+120 14 95
+160 14 87
+200 14 82
+240 14 81
+80 20 85
+120 20 91
+160 20 93
+200 20 94
+240 20 93
+80 40 48
+120 40 66
+160 40 70
+200 40 73
+240 40 73
+```
+
+Print out definitions for columns in cor/knn stats
+```
+-------------------------------------------------------------------------------
+ L       Percentage of nodes in the largest component
+ D       Percentage of nodes in components of size at most 3 [-div option]
+ R       Percentage of nodes not in L or D: 100 - L -D
+ S       Percentage of nodes that are singletons
+ E       Fraction of edges retained (input graph has 87883982)
+ cce     Expected size of component, nodewise [ sum(sz^2) / sum^2(sz) ]
+ EW      Edge weight traits (mean, median and IQR)
+ ND      Node degree traits [mean, median and IQR]
+ CCF     Clustering coefficient (scale 1-100)
+ eff     Induced component efficiency relative to start graph (scale 1-1000)
+k-NN     The knn parameter
+```
+
