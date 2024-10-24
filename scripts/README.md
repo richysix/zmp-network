@@ -7,24 +7,28 @@ flowchart TB
     subgraph " "
     v0["expt_file"]
     v1["all_counts_file"]
-    v15["infl_values_ch"]
-    v21["annotation_ch"]
-    v22["go_annotation_ch"]
+    v12["threshold_params_ch"]
+    v16["infl_values_ch"]
+    v22["annotation_ch"]
+    v23["go_annotation_ch"]
+    v24["zfa_annotation_ch"]
     end
     v2([SUBSET])
     v5([CREATE_BASE_NETWORK])
     v9([TEST_PARAMETERS])
-    v12([THRESHOLD])
-    v16([CLUSTER])
-    v23([MCLTOGRAPH])
+    v13([THRESHOLD])
+    v17([CLUSTER])
+    v25([MCLTOGRAPH])
+    v28([ENRICHMENT])
     subgraph " "
-    v25[" "]
+    v30["enrich_ch"]
     end
     v3(( ))
     v6(( ))
     v10(( ))
-    v13(( ))
-    v24(( ))
+    v14(( ))
+    v26(( ))
+    v29(( ))
     v0 --> v2
     v1 --> v2
     v2 --> v3
@@ -32,16 +36,20 @@ flowchart TB
     v5 --> v6
     v6 --> v9
     v9 --> v10
-    v10 --> v12
     v12 --> v13
-    v15 --> v16
-    v13 --> v16
-    v16 --> v6
-    v21 --> v23
-    v22 --> v23
-    v6 --> v23
-    v23 --> v24
+    v10 --> v13
+    v13 --> v14
+    v16 --> v17
+    v14 --> v17
+    v17 --> v6
+    v22 --> v25
+    v23 --> v25
     v24 --> v25
+    v6 --> v25
+    v25 --> v26
+    v26 --> v28
+    v28 --> v29
+    v29 --> v30
 ```
 
 ### SUBSET (big_mem_retry)
@@ -131,12 +139,14 @@ Outputs:
 
 1.  Dir name: name of experiment
 
-2.  Tuple of MCI files: MCL network files pruned using correlation
+2.  Threshold
+
+3.  Tuple of MCI files: MCL network files pruned using correlation
     and/or knn threshold. These are flattened so that the next process
     receives the expt name, string of threshold parameters and mci file
     for those parameters.
 
-3.  Stats file created if both correlation and knn threshold are set
+4.  Stats file created if both correlation and knn threshold are set
 
 Script: Runs `mcx alter` and `mcx query`
 
