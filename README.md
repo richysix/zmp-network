@@ -716,3 +716,18 @@ find results/ -type l | xargs ls -lh | awk '{print $9, $11}' > results-symlinks.
 ## TO DO
 Write a script to restore the results and work directories so that it can be
 resumed without rerunning all the jobs
+
+Test getting MCL to output a mtrix of all the correlation values
+```bash
+base=all-tpm-orig
+mcxdump -imx $base.mci -o - -tabc all-tpm.tab \
+--dump-lines -digits 3 -sep-field "," -sep-lead "," 2> /dev/null | \
+sed -e 's|[0-9][0-9]*:||g' | \
+cat <( cut -f2 all-tpm.tab | awk 'BEGIN{ ORS="" }{ print $1 "," }' | \
+sed -e 's|,$|\n|; s|^|GeneID,|' ) - > $base.mat.csv
+
+mcxdump -imx expt-zmp_ph192/all-tpm-orig.mci \
+-tab expt-zmp_ph192/all-tpm.tab --dump-table \
+-digits 3 -sep-field "," -sep-lead "," \
+-o expt-zmp_ph192/all-tpm-orig.mat.csv
+```
