@@ -45,13 +45,17 @@ cors <- matrix(c(1, 0.8, 0.75, 0.78,
 set.seed(665)
 expr <- rnorm_multi(n = 12, vars = 4, mu = c(5, 10, 15, 20), r = cors) |> 
   t() |> 
-  magrittr::set_colnames(paste0('sample-', 1:12, " count")) |> 
+  magrittr::set_colnames(paste0('sample-', 1:12, " normalised count")) |> 
   magrittr::set_rownames(paste0('ENSDARG0000000000', 1:4)) |> 
   as_tibble(expr, rownames = "GeneID") |> 
-  mutate(`Gene name` = paste0('gene-', 1:4)) |> 
+  mutate(across(starts_with("sample"), trunc, .names = "{.col} int"),
+         `Gene name` = paste0('gene-', 1:4)) |> 
+  rename_with(\(x) sub("normalised count int", "count", x)) |> 
+  relocate(matches("normalised"), .after = `Gene name`) |> 
   relocate(`Gene name`, .after = GeneID)
 
 write_csv(expr, file = file.path(data_dir, "test-counts.csv"))
+write_csv(expr, file = file.path(data_dir, "test-counts.csv.gz"))
 
 tibble(
   expt = rep("test", 12),
