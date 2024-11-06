@@ -51,7 +51,7 @@ expr <- rnorm_multi(n = 12, vars = 4, mu = c(5, 10, 15, 20), r = cors) |>
   mutate(`Gene name` = paste0('gene-', 1:4)) |> 
   relocate(`Gene name`, .after = GeneID)
 
-write_tsv(expr, file = file.path(data_dir, "test-counts.tsv"))
+write_csv(expr, file = file.path(data_dir, "test-counts.csv"))
 
 tibble(
   expt = rep("test", 12),
