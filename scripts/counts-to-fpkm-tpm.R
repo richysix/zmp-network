@@ -50,7 +50,8 @@ if (!(cmd_line_args$options[['output_format']] %in% c('tsv', 'csv'))) {
 }
 
 samples_file <- cmd_line_args$args[1]
-samples <- readr::read_tsv(samples_file, col_names = c("sample", "condition"))
+samples <- readr::read_tsv(samples_file, col_names = c("sample", "condition"),
+                           show_col_types = FALSE)
 
 in_file <- cmd_line_args$args[2]
 rnaseq_data <- load_rnaseq_data(in_file)
