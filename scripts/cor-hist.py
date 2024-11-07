@@ -6,6 +6,7 @@ import argparse
 import os
 import csv
 import math
+import sys
 
 def main(args):
     ''' Main body of code '''
@@ -16,7 +17,7 @@ def main(args):
     for i in range(-10, 10, 1):
         j = str(i + 1)
         i = str(i)
-        hist_counts[":".join((i, j))] = 0
+        hist_counts[(i, j)] = 0
     if args.debug > 1:
         print(hist_counts)
     
@@ -30,17 +31,20 @@ def main(args):
                 header = False
                 continue
             for cor in line[1:]:
+                if abs(float(cor)) == 1:
+                    continue
                 lower = math.floor(float(cor)*10)
                 upper = math.ceil(float(cor)*10)
                 if lower == upper:
                     lower = upper - 1
-                hist_counts[":".join((str(lower), str(upper)))] += 1
+                hist_counts[(str(lower), str(upper))] += 1
 
     if args.debug > 1:
         print(hist_counts)
     for k in hist_counts.keys():
-        start, stop = k.split(":")
-        print(f"{int(start)/10:.1f}\t{int(stop)/10:.1f}\t{hist_counts[k]}")
+        start, stop = k
+        print(f"{int(start)/10:.1f}\t{int(stop)/10:.1f}\t{hist_counts[k]}",
+            file = args.output_file)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=desc,
@@ -48,6 +52,8 @@ if __name__ == '__main__':
     parser.add_argument('cor_mat_file', metavar='COR_MATRIX_FILE',
         type=str, default='all-tpm-orig.mat.csv', 
         help='File with a matrix of cor values')
+    parser.add_argument('output_file', nargs='?', metavar='OUTFILE',
+        type=argparse.FileType('w'), default=sys.stdout, help='Output file name')
     parser.add_argument('--debug', action='count', default=0,
         help='Prints debugging information')
     args = parser.parse_args()
