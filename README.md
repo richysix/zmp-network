@@ -753,3 +753,60 @@ Thu Oct 24 17:41:40 BST 2024
 # perl     5"           17'57"
 # python   2"           10'47"
 ```
+
+Select some extra experiments to test that aren't tfap2 ones
+Look at expts with at least 100 sig genes and less than 550
+```bash
+local_effect_dir=$SCRATCH/detct/grcz11/local_effect
+awk -F"\t" '{if($2 > 100 && $2 < 550){ print $0 }}' $local_effect_dir/sig_genes-expts.tsv | \
+sort -k1,1 | join -t$'\t' - <( cut -f1,4 $local_effect_dir/expt_sample_stage.txt | sort -t$'\t' -u ) | \
+join -t$'\t' - <( sort -t$'\t' -k1,1 $local_effect_dir/expt-info.txt ) \
+> $local_effect_dir/expt-sig-count-stage-info.txt
+```
+
+Picked a few expets and looked through samples. Excluded expts with clutch
+effects and row effects.
+Picked 4
+
+```
+grep -E 'zmp_ph(46|71|204|213)' $local_effect_dir/expt-sig-count-stage-info.txt | \
+cut -f1-3,5-8 | cat <( echo -e "expt\tsig-genes\tstage\tallele\tgene\tEnsemblID" ) - | \
+column -t
+expt       sig-genes  stage        allele   gene   EnsemblID
+zmp_ph204  127        ZFS:0000033  hu3072   dag1   ENSDARG00000016153
+zmp_ph213  464        ZFS:0000037  hu2849   neb    ENSDARG00000032630
+zmp_ph46   449        ZFS:0000037  sa2042   gpaa1  ENSDARG00000074571
+zmp_ph71   139        ZFS:0000037  sa18880  nod2   ENSDARG00000010756
+```
+
+Make new expt file
+```
+grep -E "^expt|zmp_ph(192|238|250|46|71|204|213)\b" \
+$SCRATCH/detct/grcz11/expt-sample-condition.tsv > $SCRATCH/detct/grcz11/expt-sample-condition-tfap2-plus.tsv
+```
+
+Count samples per expt
+```
+cut -f1 $SCRATCH/detct/grcz11/expt-sample-condition-tfap2-plus.tsv | \
+grep -v expt | uniq -c
+     90 zmp_ph192
+     23 zmp_ph204
+     24 zmp_ph213
+     87 zmp_ph238
+     89 zmp_ph250
+     24 zmp_ph46
+     22 zmp_ph71
+```
+
+Run new pipeline
+```
+params="-with-dag -with-report -with-timeline"
+options="--expts $SCRATCH/detct/grcz11/expt-sample-condition-tfap2-plus.tsv \
+--clustering true"
+qsub -m bea -M bty114@qmul.ac.uk qsub/run-nextflow.sh -d -o "$options" -p "$params" scripts/main.nf
+# to rerun
+qsub -m bea -M bty114@qmul.ac.uk qsub/run-nextflow.sh -d -o "$options" -p "$params" -r current scripts/main.nf
+
+# or with no reports
+qsub qsub/run-nextflow.sh -d -o "$options" -r current scripts/main.nf
+```
