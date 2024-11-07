@@ -34,7 +34,11 @@ process SUBSET {
     val all_counts_file
 
     output:
-    path("${params.DirPrefix}-*")
+    tuple(
+        path("expts.txt"),
+        path("${params.DirPrefix}-*/samples.tsv"),
+        path("${params.DirPrefix}-*/counts-by-gene.tsv")
+    )
 
     script:
     """
@@ -48,29 +52,40 @@ process CREATE_BASE_NETWORK {
     publishDir "results", pattern: "*/all-tpm*"
 
     input: 
-    path expt_dir
+    tuple val(expt_dir), path(sample_file), path(count_file)
 
     output:
-    tuple env(dir), path("*/all-tpm.tsv"), path("*/all-tpm.tab"), path("*/all-tpm-orig.mci")
+    tuple val(expt_dir), path("$expt_dir/all-tpm.tsv"),
+        path("$expt_dir/all-tpm.tab"), path("$expt_dir/all-tpm-orig.mci"),
+        path("$expt_dir/all-tpm-orig.cor-hist.txt")
 
     script:
     """
-    dir=\$( basename $expt_dir )
+    mkdir -p $expt_dir
     awk -F"\\t" '{if(NR > 1){ print \$2 "\\t" \$3 }}' \
-     $expt_dir/samples.tsv > $expt_dir/samples.txt
+     $sample_file > $expt_dir/samples.txt
 
     module load R/$params.RVersion
     Rscript $params.ScriptDir/counts-to-fpkm-tpm.R \
     --transcripts_file $params.transcriptFile \
-    --output_base \$dir/all --output_format tsv \
-    --tpm $expt_dir/samples.txt $expt_dir/counts-by-gene.tsv
+    --output_base $expt_dir/all --output_format tsv \
+    --tpm $expt_dir/samples.txt $count_file
 
     module load MCL/$params.mclVersion
 
-    mcxarray -data \$dir/all-tpm.tsv -co 0 \
+    mcxarray -data $expt_dir/all-tpm.tsv -co 0 \
     $params.skipRows $params.skipCols \
     $params.corMeasure $params.labels \
-    -o \$dir/all-tpm-orig.mci -write-tab \$dir/all-tpm.tab
+    -o $expt_dir/all-tpm-orig.mci -write-tab $expt_dir/all-tpm.tab
+
+    mcxdump -imx $expt_dir/all-tpm-orig.mci \
+    -tab $expt_dir/all-tpm.tab --dump-table \
+    -digits 3 -sep-field "," -sep-lead "," \
+    -o $expt_dir/all-tpm-orig.mat.csv
+
+    module load Python/$params.PythonVersion
+    python ${params.ScriptDir}/cor-hist.py \
+    $expt_dir/all-tpm-orig.mat.csv $expt_dir/all-tpm-orig.cor-hist.txt
     """
 }
 
@@ -308,10 +323,19 @@ process ENRICHMENT {
 workflow {
 
     subset_output_ch = SUBSET(params.expts, params.all_counts)
-        .flatten()
         .view()
+    sample_files = subset_output_ch
+        .flatMap { it[1] }
+        .map { [ it.parent.baseName, it ]}
+        .view()
+    count_files = subset_output_ch
+        .flatMap { it[2] }
+        .map { [ it.parent.baseName, it ]}
+        .view()
+    files_by_expt = sample_files.join(count_files).view()
 
-    orig_ch = CREATE_BASE_NETWORK(subset_output_ch).view()
+    orig_ch = CREATE_BASE_NETWORK(files_by_expt).view()
+    expt_tab_ch = orig_ch.map { [it[0], it[2]]}
 
     tpm_ch = orig_ch
         .map { [it[0], it[1]] }
@@ -347,8 +371,8 @@ workflow {
         cluster_ch = CLUSTER(filtered_ch, infl_values_ch)
             .view()
 
-        mci_ch = orig_ch.cross(cluster_ch)
-            .map { [it[0][0], it[0][2], it[1][1], it[1][2] ] }
+        mci_ch = expt_tab_ch.cross(cluster_ch)
+            .map { [it[0][0], it[0][1], it[1][1], it[1][2] ] }
             .view()
         
         annotation_ch = channel.value(params.AnnotationFile)

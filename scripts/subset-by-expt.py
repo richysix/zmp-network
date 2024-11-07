@@ -32,8 +32,6 @@ def output_aggregate_counts_for_expt(expt_name, df, sample_info, expts_outfh, ar
         print(f"{expt_name}: None of the required samples are present in "
                 f"the counts file", file = sys.stderr)
         return(None)
-    else:
-        print(f"{expt_name}", file = expts_outfh)
 
     # create directory
     if args.output_dir_prefix is None:
@@ -42,6 +40,8 @@ def output_aggregate_counts_for_expt(expt_name, df, sample_info, expts_outfh, ar
         output_dir = "-".join([args.output_dir_prefix, expt_name])
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
+    print(f"{output_dir}", file = expts_outfh)
+    
     # write samples file
     outfile = os.path.join(output_dir, "samples.tsv")
     sample_info.filter(expt = expt_name
@@ -88,10 +88,6 @@ def main(args):
 
     # open output file
     expts_outfh = open(args.expts_outfile, mode = 'w')
-    # create output dir
-#    if args.output_dir is not None:
-#        if not os.path.exists(args.output_dir):
-#            os.mkdir(args.output_dir)
 
     for expt in expts:
         if args.verbose:
