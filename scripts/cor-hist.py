@@ -7,11 +7,17 @@ import os
 import csv
 import math
 import sys
+import re
+import gzip
 
 def main(args):
     ''' Main body of code '''
     # work out delimiter based on filename extension
     filename, extension = os.path.splitext(args.cor_mat_file)
+    gzipped = False
+    if extension == ".gz":
+        gzipped = True
+        filename, extension = os.path.splitext(filename)
     delim = "," if extension == ".csv" else "\t"
     hist_counts = {}
     for i in range(-10, 10, 1):
@@ -21,23 +27,28 @@ def main(args):
     if args.debug > 1:
         print(hist_counts)
     
-    with open(args.cor_mat_file, 'r', newline='') as csv_in:
-        # read in input
-        file_h = csv.reader(csv_in, quotechar='"', delimiter=delim,
-                            quoting=csv.QUOTE_ALL, skipinitialspace=True)
-        header = True
-        for line in file_h:
-            if header:
-                header = False
+    # read in input
+    if gzipped:
+        csv_in = gzip.open(args.cor_mat_file, 'rt', newline='')
+    else:
+        csv_in = open(args.cor_mat_file, 'r', newline='')
+
+    # read in input
+    file_lines = csv.reader(csv_in, quotechar='"', delimiter=delim,
+                        quoting=csv.QUOTE_ALL, skipinitialspace=True)
+    header = True
+    for line in file_lines:
+        if header:
+            header = False
+            continue
+        for cor in line[1:]:
+            if abs(float(cor)) == 1:
                 continue
-            for cor in line[1:]:
-                if abs(float(cor)) == 1:
-                    continue
-                lower = math.floor(float(cor)*10)
-                upper = math.ceil(float(cor)*10)
-                if lower == upper:
-                    lower = upper - 1
-                hist_counts[(str(lower), str(upper))] += 1
+            lower = math.floor(float(cor)*10)
+            upper = math.ceil(float(cor)*10)
+            if lower == upper:
+                lower = upper - 1
+            hist_counts[(str(lower), str(upper))] += 1
 
     if args.debug > 1:
         print(hist_counts)

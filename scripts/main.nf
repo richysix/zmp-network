@@ -50,15 +50,17 @@ process SUBSET {
 
 process CREATE_BASE_NETWORK {
     label 'big_mem_retry'
-    publishDir "results", pattern: "*/all-tpm*"
+    publishDir "results", pattern: "*/*all-tpm*"
 
     input: 
     tuple val(expt_dir), path(sample_file), path(count_file)
 
     output:
-    tuple val(expt_dir), path("$expt_dir/all-tpm.tsv"),
-        path("$expt_dir/all-tpm.tab"), path("$expt_dir/all-tpm-orig.mci"),
-        path("$expt_dir/all-tpm-orig.cor-hist.txt")
+    tuple val(expt_dir),
+        path("$expt_dir/all-tpm.tsv"), path("$expt_dir/all-tpm.tab"),
+        path("$expt_dir/all-tpm-orig.mcx"), path("$expt_dir/all-tpm-t20.mcx"),
+        path("$expt_dir/all-tpm-orig.mat.csv.gz"),
+        path("$expt_dir/$expt_dir-all-tpm-orig.cor-hist.txt")
 
     script:
     """
@@ -74,19 +76,27 @@ process CREATE_BASE_NETWORK {
 
     module load MCL/$params.mclVersion
 
+    # make network with all edges in
     mcxarray -data $expt_dir/all-tpm.tsv -co 0 \
     $params.skipRows $params.skipCols \
     $params.corMeasure $params.labels \
-    -o $expt_dir/all-tpm-orig.mci -write-tab $expt_dir/all-tpm.tab
+    --write-binary -o $expt_dir/all-tpm-orig.mcx \
+    -write-tab $expt_dir/all-tpm.tab
 
-    mcxdump -imx $expt_dir/all-tpm-orig.mci \
+    mcxdump -imx $expt_dir/all-tpm-orig.mcx \
     -tab $expt_dir/all-tpm.tab --dump-table \
     -digits 3 -sep-field "," -sep-lead "," \
     -o $expt_dir/all-tpm-orig.mat.csv
+    gzip $expt_dir/all-tpm-orig.mat.csv
 
     module load Python/$params.PythonVersion
     python ${params.ScriptDir}/cor-hist.py \
-    $expt_dir/all-tpm-orig.mat.csv $expt_dir/all-tpm-orig.cor-hist.txt
+    $expt_dir/all-tpm-orig.mat.csv.gz $expt_dir/$expt_dir-all-tpm-orig.cor-hist.txt
+
+    # Also make one filtered with abs(), gt > 0.2
+    mcx alter -imx $expt_dir/all-tpm-orig.mcx \
+    -tf "abs(), gt(0.2)" \
+    --write-binary -o $expt_dir/all-tpm-t20.mcx
     """
 }
 
