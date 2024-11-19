@@ -45,6 +45,16 @@ show_cols <- cmd_line_args$options$debug
 # load data
 # nodes
 nodes <- read_tsv(cmd_line_args$args[1], show_col_types = show_cols)
+if (nrow(nodes) == 0) {
+  message("The graph has no nodes. Skipping GBA analysis")
+  file.create(
+    cmd_line_args$options$auc_file,
+    cmd_line_args$options$scores_file,
+    cmd_line_args$options$plots_file
+  )
+  quit(save = "no", status = 0)
+}
+
 # nodes <- filter(nodes, cluster_id >= 80, cluster_id <= 120)
 node_idx2gene_id <- dplyr::select(nodes, node_idx, gene_id)
 # edges
@@ -103,7 +113,7 @@ optimallist_GO <-  Anno_genes_multifunc_assessment[,4]
 auc_gene_mf <- auc_multifunc(t(annotations), optimallist_GO)
 
 # Output results
-as_tibble(Anno_groups_voted[[1]], rownames = "GeneID") |>
+as_tibble(Anno_groups_voted[[1]], rownames = "TermID") |>
   arrange(desc(auc)) |>
   write_tsv(file = cmd_line_args$options$auc_file)
 

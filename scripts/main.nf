@@ -253,17 +253,22 @@ process GBA {
     output:
     tuple val(dir), path(cluster_file), path("*/all-tpm*.graphml"),
         path("*/all-tpm*.nodes.tsv"), path("*/all-tpm*.edges.tsv"),
-        path("*/all-tpm*.auc.tsv"), path("*/all-tpm*.gene-scores.tsv"),
+        path("*/$dir-all-tpm*.auc.tsv"), path("*/all-tpm*.gene-scores.tsv"),
         path("*/all-tpm*.GBA-plots.pdf")
 
     script:
-    matches = (mci_file =~ /all-tpm-(t?)(\d*)-?(k?)(\d*).mci$/)
+    matches = (mci_file =~ /all-tpm-(t?)(\d*)-?(k?)(\d*).mcx$/)
     t_num = get_threshold(matches)
     println t_num
     """
     mkdir -p ${dir}
     cluster_base=\$( basename $cluster_file )
-    
+
+    # convert from binary
+    module load MCL/${params.mclVersion}
+    mci_base=\$( basename $mci_file .mcx)
+    mcx convert $mci_file \${mci_base}.mci
+
     # run convert_mcl script
     module load Python/$params.PythonVersion
     python ${params.ScriptDir}/convert_mcl.py \
@@ -272,11 +277,11 @@ process GBA {
     --nodes_file ${dir}/\${cluster_base}.nodes.tsv \
     --edges_file ${dir}/\${cluster_base}.edges.tsv \
     --edge_offset ${t_num} \
-    $mci_file $cluster_file $tab_file $annotation_file
+    \${mci_base}.mci $cluster_file $tab_file $annotation_file
 
     module load R/$params.RVersion
     Rscript ${params.ScriptDir}/run-GBA-network.R \
-    --auc_file ${dir}/\${cluster_base}.go.auc.tsv \
+    --auc_file ${dir}/${dir}-\${cluster_base}.go.auc.tsv \
     --scores_file ${dir}/\${cluster_base}.go.gene-scores.tsv \
     --plots_file ${dir}/\${cluster_base}.go.GBA-plots.pdf \
     --min.term.size $params.minTermSize --max.term.size $params.maxTermSize \
@@ -285,7 +290,7 @@ process GBA {
     $go_annotation_file
 
     Rscript ${params.ScriptDir}/run-GBA-network.R \
-    --auc_file ${dir}/\${cluster_base}.zfa.auc.tsv \
+    --auc_file ${dir}/${dir}-\${cluster_base}.zfa.auc.tsv \
     --scores_file ${dir}/\${cluster_base}.zfa.gene-scores.tsv \
     --plots_file ${dir}/\${cluster_base}.zfa.GBA-plots.pdf \
     --min.term.size $params.minTermSize --max.term.size $params.maxTermSize \
