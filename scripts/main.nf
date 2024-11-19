@@ -209,7 +209,7 @@ process FILTER_STATS {
 
 // Cluster network
 process CLUSTER {
-    label 'retry'
+    label 'med_mem_retry'
     publishDir "results", pattern: "*/all-tpm*"
     
     input:
@@ -217,8 +217,8 @@ process CLUSTER {
     each inflation
 
     output:
-    tuple val(dir), path(mci_file), path("*/*.mci.I[0-9][0-9]"),
-        path("*/*.mci.I[0-9][0-9].stats.tsv"), path("*/*.mci.I[0-9][0-9].cl*")
+    tuple val(dir), path(mci_file), path("*/*.mcx.I[0-9][0-9]"),
+        path("*/*.mcx.I[0-9][0-9].stats.tsv"), path("*/*.mcx.I[0-9][0-9].cl*")
 
     script:
     Integer inflationSuffix = inflation * 10
@@ -235,7 +235,8 @@ process CLUSTER {
     $dir/${mci_file}.I${inflationSuffix} > $dir/${mci_file}.I${inflationSuffix}.stats.tsv
 
     module load Python/$params.PythonVersion
-    python ${params.ScriptDir}/summarise_clustering.py $dir/${mci_file}.I${inflationSuffix}
+    python ${params.ScriptDir}/summarise_clustering.py \
+    --expt_name $dir $dir/${mci_file}.I${inflationSuffix}
     """
 }
 

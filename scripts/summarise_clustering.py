@@ -6,6 +6,7 @@ import polars as pl
 import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.backends.backend_pdf import PdfPages
+import os.path
 
 def main(args):
     ''' Main body of code '''
@@ -49,8 +50,15 @@ def main(args):
         "cluster_id": cluster_ids,
         "cluster_size": cluster_sizes 
     })
-    cl_size_fn = args.input_file + ".cl-sizes.tsv"
-    df.write_csv(cl_size_fn, separator = "\t")
+
+    # parse filename
+    dirname, filename = os.path.split(args.input_file)
+    if args.expt_name:
+        cl_size_fn = args.expt_name + "-" + filename + ".cl-sizes.tsv"
+    else:
+        cl_size_fn = filename + ".cl-sizes.tsv"
+    cl_size_path = os.path.join(dirname, cl_size_fn)
+    df.write_csv(cl_size_path, separator = "\t")
     no_singletons = df.filter(pl.col("cluster_size") > 1)
 
     cl_size_fn = args.input_file + ".cl-size-summary.tsv"
@@ -102,6 +110,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = desc)
     parser.add_argument('input_file', nargs='?', metavar='INFILE',
         type=str, default='all-tpm-20-k100.mci.I14', help='Input file name')
+    parser.add_argument('--expt_name', nargs='?', metavar='INFILE',
+        type=str, default=None, help='Expt name to include in output file name')
     parser.add_argument('--debug', action='count', default=0,
         help='Prints debugging information')
     params = parser.parse_args()
