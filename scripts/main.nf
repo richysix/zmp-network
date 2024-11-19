@@ -28,6 +28,7 @@ def get_threshold(m) {
 // see README
 process SUBSET {
     label 'big_mem_retry'
+    publishDir "results", pattern: "expts.txt"
 
     input: 
     val expt_file
@@ -36,14 +37,14 @@ process SUBSET {
     output:
     tuple(
         path("expts.txt"),
-        path("${params.DirPrefix}-*/samples.tsv"),
-        path("${params.DirPrefix}-*/counts-by-gene.tsv")
+        path("*/samples.tsv"),
+        path("*/counts-by-gene.tsv")
     )
 
     script:
     """
     $params.QsubDir/subset-by-expt.sh -s ${params.ScriptDir} \
--o ${params.DirPrefix} ${expt_file} ${all_counts_file}
+    ${expt_file} ${all_counts_file}
 """
 }
 

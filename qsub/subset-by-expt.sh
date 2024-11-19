@@ -50,7 +50,11 @@ Expt file: $1
 Counts file: $2"
 fi
 
-lines=$( gzip -cd $2 | wc -l )
+if file --mime-type --brief $2 | grep -q 'gzip$'; then
+  lines=$( gzip -cd $2 | wc -l )
+else
+  lines=$( wc -l $2 | awk '{print $1}' )
+fi
 python $SCRIPT_DIR/subset-by-expt.py --infer_schema_length=$lines $OUTPUT_DIR $1 $2
 SUCCESS=$?
 

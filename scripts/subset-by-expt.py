@@ -15,7 +15,6 @@ import re
 import gzip
 import os
 import sys
-from itertools import repeat
 
 def output_aggregate_counts_for_expt(expt_name, df, sample_info, expts_outfh, args):
     ''' Function to subset the data frame to just the counts for an 
@@ -32,6 +31,10 @@ def output_aggregate_counts_for_expt(expt_name, df, sample_info, expts_outfh, ar
         print(f"{expt_name}: None of the required samples are present in "
                 f"the counts file", file = sys.stderr)
         return(None)
+    if not all([ x in df.columns for x in sample_names ]):
+        print(f"{expt_name}: Not all of the required samples are present in "
+              f"the counts file. Subsetting to those that are available.", 
+              file = sys.stderr)
 
     # create directory
     if args.output_dir_prefix is None:
@@ -46,9 +49,9 @@ def output_aggregate_counts_for_expt(expt_name, df, sample_info, expts_outfh, ar
     outfile = os.path.join(output_dir, "samples.tsv")
     sample_info.filter(expt = expt_name
         ).write_csv(outfile, separator = "\t")
-        
+
     # select columns by name
-    subset = df.select(cs.by_name(df.columns[0:15]) | 
+    subset = df.select(cs.by_name(["GeneID", "Gene name"]) | 
             cs.by_name(sample_names)
         ).filter(pl.col("GeneID").str.contains("ENSDARG") & 
         ~pl.col("GeneID").str.contains(",")
@@ -74,7 +77,7 @@ def main(args):
     if re.search("\\.gz$", args.count_file):
         fh = gzip.open(args.count_file)
     else:
-        fh = open(args.count_file)
+        fh = args.count_file
 
     all_data = pl.read_csv(fh, infer_schema_length = args.infer_schema_length)
 
