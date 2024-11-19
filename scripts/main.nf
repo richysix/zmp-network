@@ -158,7 +158,7 @@ process FILTER_COR {
 }
 
 process FILTER_KNN {
-    label 'retry'
+    label 'big_mem_retry'
     publishDir "results", pattern: "*/all-tpm*"
 
     input:
@@ -166,18 +166,23 @@ process FILTER_KNN {
     each knn_threshold
 
     output:
-    tuple val(dir), path("$dir/*-[k][0-9]*.mci"),
-        path("$dir/*stats.tsv")
+    tuple val(dir), path("$dir/*-[k][0-9]*.mcx"),
+        path("$dir/$dir-all-tpm-t*-k*.stats.tsv")
 
     script:
+    threshold=0.2
+    thresholdSuffix=20
     """
     module load MCL/$params.mclVersion
 
     mkdir -p $dir
-    knnBase=${dir}/all-tpm-t20-k${knn_threshold}
-    mcx alter -imx ${mci_file} -tf "add(-0.2), #knn($knn_threshold)" \
-    -o \${knnBase}.mci
-    mcx query -imx \${knnBase}.mci > \${knnBase}.stats.tsv
+    knnBase="all-tpm-t${thresholdSuffix}-k${knn_threshold}"
+    mcx alter -imx ${mci_file} \
+    -tf "abs(), gt(${threshold}), add(-${threshold}), #knn($knn_threshold)" \
+    --write-binary -o $dir/\${knnBase}.mcx
+    # stats
+    mcx alter -imx $dir/\${knnBase}.mcx -tf "add(${threshold})" | \
+    mcx query -imx - > $dir/$dir-\${knnBase}.stats.tsv
     """
 }
 
