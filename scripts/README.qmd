@@ -35,7 +35,9 @@ Script:
 
 ### CREATE_BASE_NETWORK (big_mem_retry)
 
-Creates a base correlation network containing ALL edges.
+Creates a base correlation network containing ALL edges and one with 
+edge weights converted to absolute values and edges with weights less than 
+0.2 descarded.
 
 Inputs:
 
@@ -47,14 +49,19 @@ Inputs:
 
 Outputs:
 
-1. Dir name: name of experiment
+1. Dir name: name of experiment.
 
-1. TPM file: Tab-separated file of TPMs used to create the network
+1. TPM file: Tab-separated file of TPMs used to create the network.
 
-1. TAB file: File output by MCL mapping node ids to gene ids
+1. TAB file: File output by MCL mapping node ids to gene ids.
 
-1. MCI file: MCL network file detailing all the edges in the network and their
+1. MCX file: MCL network (binary) file detailing all the edges in the network and their
 weights.
+
+1. t20 MCX file: MCL network (binary) file with absolute edge weights.
+Edges with weights less than 0.2 have been removed.
+
+1. MAT file: Gzipped file containing all edge weights in a matrix format.
 
 1. Cor hist file: contains counts of edges with correlation values in 0.1 width bins
 
