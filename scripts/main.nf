@@ -300,6 +300,26 @@ process GBA {
     """
 }
 
+process GBA_SUMMARY {
+    label 'retry'
+    publishDir "results", pattern: "plots/*.pdf"
+
+    input:
+    path("expts.txt")
+    path("*")
+    path("*")
+
+    output:
+    path("plots/*.pdf")
+
+    script:
+    """
+    module load R/$params.RVersion
+    Rscript ${params.ScriptDir}/gba-analysis.R \
+    --samples_file $params.expts
+    """
+}
+
 // process ANNOTATION {
 //     label 'retry'
 //     publishDir "reference", pattern: "*"
