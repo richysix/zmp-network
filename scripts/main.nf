@@ -131,7 +131,7 @@ process TEST_PARAMETERS {
 
 // Threshold
 process FILTER_COR {
-    label 'retry'
+    label 'big_mem_retry'
     publishDir "results", pattern: "*/all-tpm*"
     
     input:
@@ -139,21 +139,21 @@ process FILTER_COR {
     each threshold
 
     output:
-    tuple val(dir), path("$dir/*-[t][0-9]*.mci"),
-        path("$dir/*stats.tsv")
+    tuple val(dir), path("$dir/*-[t][0-9]*.mcx"),
+        path("$dir/$dir-all-tpm-t*.stats.tsv")
 
     script:
     Integer suffix = threshold * 100
-    outputBase = [dir, "/all-tpm"].join('')
-    thresholdBase = [outputBase, "t$suffix"].join("-")
     """
     module load MCL/$params.mclVersion
 
     mkdir -p $dir
-    mcx alter -imx ${mci_file} -tf \
-    "gq(${threshold}), add(-${threshold})" \
-    -o ${thresholdBase}.mci
-    mcx query -imx ${thresholdBase}.mci > ${thresholdBase}.stats.tsv
+    mcx alter -imx ${mci_file} \
+    -tf "gt(${threshold}), add(-${threshold})" \
+    --write-binary -o $dir/all-tpm-t${suffix}.mcx
+    mcx alter -imx $dir/all-tpm-t${suffix}.mcx \
+    -tf "add(${threshold})" | mcx query -imx - > \
+    $dir/$dir-all-tpm-t${suffix}.stats.tsv
     """
 }
 
