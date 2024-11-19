@@ -68,6 +68,13 @@ expr <- rnorm_multi(n = samples_per_expt * length(expts), vars = ncol(cors),
 write_csv(expr, file = file.path(data_dir, "test-counts.csv"))
 write_csv(expr, file = file.path(data_dir, "test-counts.csv.gz"))
 
+# create fake transcripts to make fpkm normalisation produce sensible numbers
+tibble(
+  "GeneID" = expr$GeneID,
+  "Length" = 1e9
+) |> write_tsv(file = file.path(data_dir, "test-transcript-lengths.tsv"),
+               col_names = FALSE)
+
 # AUTHOR
 #
 # Richard White <rich@buschlab.org>
