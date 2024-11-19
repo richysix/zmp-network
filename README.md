@@ -764,7 +764,7 @@ join -t$'\t' - <( sort -t$'\t' -k1,1 $local_effect_dir/expt-info.txt ) \
 > $local_effect_dir/expt-sig-count-stage-info.txt
 ```
 
-Picked a few expets and looked through samples. Excluded expts with clutch
+Picked a few expts and looked through samples. Excluded expts with clutch
 effects and row effects.
 Picked 4
 
@@ -798,14 +798,15 @@ grep -v expt | uniq -c
      22 zmp_ph71
 ```
 
-Run new pipeline
+Run new pipeline with email notfication
 ```
-params="-with-dag -with-report -with-timeline"
-options="--expts $SCRATCH/detct/grcz11/expt-sample-condition-tfap2-plus.tsv \
---clustering true"
-qsub -m bea -M bty114@qmul.ac.uk qsub/run-nextflow.sh -d -o "$options" -p "$params" scripts/main.nf
+qsub -m bea -M bty114@qmul.ac.uk qsub/run-nextflow.sh -d \
+-o "--expts $SCRATCH/detct/grcz11/expt-sample-condition-tfap2-plus.tsv --clustering true" \
+-p "-with-dag -with-report -with-timeline" scripts/main.nf
 # to rerun
-qsub -m bea -M bty114@qmul.ac.uk qsub/run-nextflow.sh -d -o "$options" -p "$params" -r current scripts/main.nf
+qsub -m bea -M bty114@qmul.ac.uk qsub/run-nextflow.sh -d \
+-o "--expts $SCRATCH/detct/grcz11/expt-sample-condition-tfap2-plus.tsv --clustering true" \
+-p "-with-dag -with-report -with-timeline" -r current scripts/main.nf
 
 # or with no reports
 qsub qsub/run-nextflow.sh -d -o "$options" -r current scripts/main.nf
