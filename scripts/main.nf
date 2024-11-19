@@ -358,7 +358,7 @@ process ENRICHMENT {
     --min_cluster_size $params.goMinClusterSize \
     $nodes_file \$cluster_base
 
-    if [[ \$( find ./ -type f -name "\${cluster_base}.cluster-*" | wc -l ) -eq 0 ]] ; then
+    if [[ \$( find ./ -type f -name "\${cluster_base}.cluster-*" | wc -l ) -le 1 ]] ; then
         echo "No clusters to test!"
         echo "No clusters to test!" > ${dir}/GO/done.txt
     else
