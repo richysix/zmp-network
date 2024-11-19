@@ -89,6 +89,35 @@ tibble(
 ) |> write_tsv(file = file.path(data_dir, "test-annotation.txt"),
                col_names = FALSE)
 
+# create fake GO/ZFA annotation
+# GO
+tibble(
+  GeneID = c(rep("ENSDARG00000000001", 8), rep("ENSDARG00000000002", 2),
+             rep("ENSDARG00000000003", 8), rep("ENSDARG00000000004", 2)),
+  TermID = rep(c("GO:0000139", "GO:0005794", "GO:0008643", "GO:0015165", 
+             "GO:0016020", "GO:0016021", "GO:0030173", "GO:0090481", 
+             "GO:0001756", "GO:0005576"), 2),
+  Domain = rep(
+    c("cellular_component", "cellular_component", "biological_process",
+      "molecular_function", "cellular_component", "cellular_component",
+      "cellular_component", "biological_process", "biological_process",
+      "cellular_component"), 2)
+) |> write_tsv(file = file.path(data_dir, "test-go.txt"),
+               col_names = FALSE)
+
+# ZFA
+tibble(
+  GeneID = c(rep("ENSDARG00000000001", 1), rep("ENSDARG00000000002", 21),
+             rep("ENSDARG00000000003", 1), rep("ENSDARG00000000004", 21)),
+  TermID = rep(
+    c("ZFA:0001093", "ZFA:0001056", "ZFA:0000035", "ZFA:0001094", "ZFA:0000076",
+      "ZFA:0001117", "ZFA:0000114", "ZFA:0000115", "ZFA:0000123", "ZFA:0000135",
+      "ZFA:0000140", "ZFA:0001338", "ZFA:0000149", "ZFA:0001679", "ZFA:0000155",
+      "ZFA:0000360", "ZFA:0000403", "ZFA:0000008", "ZFA:0000546", "ZFA:0000022",
+      "ZFA:0000604", "ZFA:0000028"), 2),
+) |> write_tsv(file = file.path(data_dir, "test-zfa.txt"),
+               col_names = FALSE)
+
 # AUTHOR
 #
 # Richard White <rich@buschlab.org>
