@@ -6,6 +6,7 @@ log.info """\
 
   Testing: ${params.testing}
   Clustering: ${params.clustering}
+  Debug: ${params.debug}
   Expt to sample file: ${params.expts}
   All counts file: ${params.all_counts}
   Threshold params: ${params.threshold}
@@ -383,67 +384,115 @@ process ENRICHMENT {
 workflow {
 
     subset_output_ch = SUBSET(params.expts, params.all_counts)
-        .view()
+    expts_file = subset_output_ch
+        .flatMap { it[0] }
     sample_files = subset_output_ch
         .flatMap { it[1] }
         .map { [ it.parent.baseName, it ]}
-        .view()
     count_files = subset_output_ch
         .flatMap { it[2] }
         .map { [ it.parent.baseName, it ]}
-        .view()
-    files_by_expt = sample_files.join(count_files).view()
+    files_by_expt = sample_files.join(count_files)
 
-    orig_ch = CREATE_BASE_NETWORK(files_by_expt).view()
+    if ( params.debug ) {
+        subset_output_ch.view { x -> "Subset output: $x" }
+        expts_file.view { x -> "Expts file: $x"}
+        sample_files.view { x -> "Expt name + sample file: $x"}
+        count_files.view { x -> "Expt name + count file: $x"}
+        files_by_expt.view { x -> "Expt name, sample and count files: $x" }
+    }
+
+    orig_ch = CREATE_BASE_NETWORK(files_by_expt)
     expt_tab_ch = orig_ch.map { [it[0], it[2]]}
+    cor_hist_ch = orig_ch.map { it[6] }
+        .collect()
+    mci_ch = orig_ch
+        .map { [it[0], it[4]] }
+    
+    if ( params.debug ) {
+        orig_ch.view { x -> "Base network output files: $x" }
+        cor_hist_ch.view { x -> "Correlation histogram files: $x"}
+        mci_ch.view { x -> "Expt name + mcx file: $x" }
+    }
 
-    tpm_ch = orig_ch
-        .map { [it[0], it[1]] }
-        .view()
-
-    test_params_ch = TEST_PARAMETERS(tpm_ch)
-        .map { [it[0], it[1]] }
-        .view()
+    stats_ch = TEST_PARAMETERS(mci_ch)
+        .map { [it[1], it[2]] }
+        .collect()
+    if ( params.debug ) {
+        stats_ch.view { x -> "Stats files: $x" }
+    }
 
     if (params.threshold) {
         threshold_params_ch = channel.value(params.threshold)
-        filter_cor_ch = FILTER_COR(test_params_ch, threshold_params_ch)
-            .view()
+        filter_cor_ch = FILTER_COR(mci_ch, threshold_params_ch)
+        if ( params.debug ) {
+            filter_cor_ch.view { x -> "Filtered network files: $x" }
+        }
     }
-
     if (params.knn) {
         knn_params_ch = channel.value(params.knn)
-        filter_knn_ch = FILTER_KNN(test_params_ch, knn_params_ch)
-            .view()
+        filter_knn_ch = FILTER_KNN(mci_ch, knn_params_ch)
+        if ( params.debug ) {
+            filter_knn_ch.view { x -> "Filtered network files: $x" }
+        }
+    }
+    if (params.threshold && params.knn) {
+        filtered_ch = filter_cor_ch.concat(filter_knn_ch)
+    } else if (params.threshold) {
+        filtered_ch = filter_cor_ch
+    } else {
+        filtered_ch = filter_knn_ch
+    }
+
+    if ( params.debug ) {
+        filtered_ch.view { x -> "MCI files to cluster: $x" }
+    }
+
+    filtered_stats_ch = filtered_ch.map { it[2] }
+        .collect()
+        
+    FILTER_STATS(expts_file, cor_hist_ch, stats_ch, filtered_stats_ch)
+    if ( params.debug ) {
+        filtered_stats_ch.view { x -> "Stats files from Filter processes: $x" }
     }
 
     if (params.clustering) {
 
-        if (params.threshold && params.knn) {
-            filtered_ch = filter_cor_ch.concat(filter_knn_ch)
-                .view()
-        } else if (params.threshold) {
-            filtered_ch = filter_cor_ch
-        } else {
-            filtered_ch = filter_knn_ch
-        }
         infl_values_ch = channel.value(params.inflationParams)
         cluster_ch = CLUSTER(filtered_ch, infl_values_ch)
-            .view()
 
-        mci_ch = expt_tab_ch.cross(cluster_ch)
+        tab_ch = expt_tab_ch.cross(cluster_ch)
             .map { [it[0][0], it[0][1], it[1][1], it[1][2] ] }
-            .view()
         
         annotation_ch = channel.value(params.AnnotationFile)
         go_annotation_ch = channel.value(params.GOFile)
         zfa_annotation_ch = channel.value(params.ZFAFile)
-        gba_ch = GBA(mci_ch, annotation_ch, go_annotation_ch,
+        gba_ch = GBA(tab_ch, annotation_ch, go_annotation_ch,
                        zfa_annotation_ch)
-            .view()
+
+        if ( params.debug ) {
+            cluster_ch.view { x -> "Clustered MCI file: $x" }
+            tab_ch.view { x -> "Tab file with clustered MCI file: $x" }
+            gba_ch.view { x -> "Graph output files: $x" }
+        }
 
         nodes_ch = gba_ch
             .map( { [it[0], it[1], it[3]] } )
         enrich_ch = ENRICHMENT(nodes_ch, go_annotation_ch)
+
+        auc_stats_ch = gba_ch
+            .map( { it[5] } )
+            .collect()
+        cluster_sizes_ch = cluster_ch
+            .map { it[4][3] }
+            .collect()
+
+        gba_summary_ch = GBA_SUMMARY(expts_file, auc_stats_ch, cluster_sizes_ch)
+
+        if ( params.debug ) {
+            auc_stats_ch.view { x -> "AUC files: $x" }
+            cluster_sizes_ch.view { x -> "Cluster sizes files: $x" }
+            gba_summary_ch.view { x -> "GBA summary plot files: $x" }
+        }
     }
 }
