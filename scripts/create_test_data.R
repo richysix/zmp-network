@@ -75,6 +75,20 @@ tibble(
 ) |> write_tsv(file = file.path(data_dir, "test-transcript-lengths.tsv"),
                col_names = FALSE)
 
+# create fake annotation file
+set.seed(67)
+tibble(
+  "GeneID" = expr$GeneID,
+  "Chr" = sample(1:25, ncol(cors)),
+  "Start" = seq(100, 400, 100),
+  "End" = c(200, 500, 600, 350),
+  "Strand" = rep("1", ncol(cors)),
+  "Biotype" = rep("protein_coding", ncol(cors)),
+  "Name" = paste("gene", seq_len(ncol(cors)), sep = "-"),
+  "Description" = paste("gene", seq_len(ncol(cors)), sep = "-")
+) |> write_tsv(file = file.path(data_dir, "test-annotation.txt"),
+               col_names = FALSE)
+
 # AUTHOR
 #
 # Richard White <rich@buschlab.org>

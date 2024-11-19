@@ -1,0 +1,4 @@
+ENSDARG00000000001	11	100	200	1	protein_coding	gene-1	gene-1
+ENSDARG00000000002	20	200	500	1	protein_coding	gene-2	gene-2
+ENSDARG00000000003	1	300	600	1	protein_coding	gene-3	gene-3
+ENSDARG00000000004	14	400	350	1	protein_coding	gene-4	gene-4
