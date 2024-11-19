@@ -103,32 +103,29 @@ process CREATE_BASE_NETWORK {
 // Create a basic network with a correlation threshold of 0.2
 // Test varying threshold and knn parameters
 process TEST_PARAMETERS {
-    label 'med_mem_retry'
+    label 'big_mem_retry'
     publishDir "results", pattern: "*/all-tpm*"
     
     input:
-    tuple val(dir), path(tpms_file)
+    tuple val(dir), path(mci_file)
 
     output:
-    tuple val(dir), path("$dir/all-tpm-20.mci"), 
-        path("$dir/all-tpm.cor-stats.tsv"), path("$dir/all-tpm.knn-stats.tsv")
+    tuple val(dir), path("$dir/$dir-all-tpm.cor-stats.tsv"),
+        path("$dir/$dir-all-tpm.knn-stats.tsv")
 
     script:
     """
     module load MCL/$params.mclVersion
     
     mkdir -p $dir
-    mcxarray -data $tpms_file -co 0.2 \
-    $params.skipRows $params.skipCols -tf 'abs()' \
-    $params.corMeasure $params.labels -o $dir/all-tpm-20.mci
-    
+
     # vary correlation
-    mcx query -imx $dir/all-tpm-20.mci --vary-correlation \
-    --output-table > $dir/all-tpm.cor-stats.tsv
+    mcx query -imx ${mci_file} --vary-correlation \
+    --output-table > $dir/$dir-all-tpm.cor-stats.tsv
 
     # test varying k-nearest neighbours
-    mcx query -imx $dir/all-tpm-20.mci -vary-knn $params.knnTestParams \
-    --output-table > $dir/all-tpm.knn-stats.tsv
+    mcx query -imx ${mci_file} -vary-knn $params.knnTestParams \
+    --output-table > $dir/$dir-all-tpm.knn-stats.tsv
     """
 }
 
