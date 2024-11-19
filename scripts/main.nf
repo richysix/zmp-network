@@ -186,6 +186,27 @@ process FILTER_KNN {
     """
 }
 
+process FILTER_STATS {
+    label 'retry'
+    publishDir "results", pattern: "plots/*.pdf"
+
+    input:
+    path("expts.txt")
+    path("*")
+    path("*")
+    path("*")
+
+    output:
+    path("plots/*.pdf")
+
+    script:
+    """
+    module load R/$params.RVersion
+    Rscript $params.ScriptDir/edge-filtering-analysis.R \
+    --samples_file $params.expts
+    """
+}
+
 // Cluster network
 process CLUSTER {
     label 'retry'
