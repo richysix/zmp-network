@@ -259,13 +259,23 @@ node_degree_data <- purrr::map(stats_files, load_node_degrees) |>
   )
 
 facetted_histograms <- function(degree_df) {
+  method <- degree_df$Method[1]
+  if (method == "knn") {
+    degree_df <- degree_df |> 
+      mutate(
+        Threshold = factor(
+          Threshold,
+          levels = unique(degree_df$Threshold) |> 
+            sort(decreasing = TRUE))
+      )
+  }
   median_by_expt_by_threshold <- degree_df |> 
+    dplyr::filter(degree > 0) |> 
     group_by(Expt, Threshold) |> 
     summarise(
       median_degree = median(degree),
       .groups = "drop"
     )
-  
   node_degree_distribution <- ggplot(data = degree_df,
                                      aes(x = degree, fill = Expt)) +
     geom_histogram(binwidth = 10, boundary = 1, show.legend = FALSE) +
@@ -277,17 +287,28 @@ facetted_histograms <- function(degree_df) {
                colour = "firebrick3") +
     scale_fill_manual(values = colour_palette) +
     theme_minimal()
+
+  node_degree_distribution_close_up <- 
+    ggplot(data = degree_df, aes(x = degree, fill = Expt)) +
+    geom_histogram(binwidth = 10, boundary = 1, show.legend = FALSE) +
+    facet_grid(rows = vars(Expt), cols = vars(Threshold)) +
+    geom_vline(data = median_by_expt_by_threshold,
+               aes(xintercept = median_degree),
+               colour = "black") +
+    geom_vline(xintercept = 100, linetype = "dashed",
+               colour = "firebrick3") +
+    scale_fill_manual(values = colour_palette) +
+    scale_x_continuous(limits = c(-10,200)) +
+    theme_minimal()
   
   out_file <- file.path(
-    plot_dir, paste(degree_df$Method[1], "stats-node-degree-distribution.pdf",
+    plot_dir, paste(method, "stats-node-degree-distribution.pdf",
                     sep = "-")
   )
-  miscr::output_plot(
-    list(plot = node_degree_distribution, filename = out_file),
-    width = 12,
-    height = 4.8
-  )
-  
+  pdf(file = out_file, width = 12, height = 4.8)
+  print(node_degree_distribution)
+  print(node_degree_distribution_close_up)
+  invisible(dev.off())
 }
 
 # cor stats
