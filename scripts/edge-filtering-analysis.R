@@ -4,12 +4,12 @@ library('optparse')
 
 option_list <- list(
   make_option(
-    "--samples_file", type="character",
-    default="/data/home/bty114/checkouts/zmp-network/data/test-samples.tsv", 
-    help="Name of the overall samples file [default %default]" 
+    "--samples_file", type = "character",
+    default = "/data/home/bty114/checkouts/zmp-network/data/expt-sample-condition-initial.tsv", 
+    help = "Name of the overall samples file [default %default]" 
   ),
-  make_option("--debug", type="logical", default=FALSE, action="store_true",
-              help="Turns on debugging statements [default %default]" )
+  make_option("--debug", type = "logical", default = FALSE, action = "store_true",
+              help = "Turns on debugging statements [default %default]" )
 )
 
 desc <- paste(
@@ -26,7 +26,7 @@ cmd_line_args <- parse_args(
 
 # load packages
 packages <- c('tidyverse', 'patchwork', 'rprojroot', 'biovisr', 'miscr')
-for( package in packages ){
+for (package in packages) {
   suppressPackageStartupMessages( suppressWarnings( library(package, character.only = TRUE) ) )
 }
 
@@ -59,7 +59,8 @@ sample_counts <- read_tsv(cmd_line_args$options$samples_file, show_col_types = F
   mutate(
     expt = fct_reorder(expt, n),
     sample_n_bin = cut(n, breaks = bin_breaks, labels = bin_labels)
-  )
+  ) |> 
+  arrange(n)
 colour_palette <- biovisr::cbf_palette(sample_counts$expt,
                                        named = TRUE)
 
@@ -129,7 +130,7 @@ combined_plot <- nodes + singletons + plot_layout(guides = 'collect')
 miscr::output_plot(
   list(plot = combined_plot, 
        filename = file.path(plot_dir, "cor-stats-nodes-singletons.pdf")),
-  width = 9.6
+  width = 12, height = 4.75
 )
 
 node_degrees <- ggplot(data = cor_stats) +
@@ -147,7 +148,7 @@ node_degrees_close_up <- ggplot(data = cor_stats) +
   geom_hline(yintercept = 100, colour = "firebrick3", linetype = "dashed") +
   geom_point(aes(x = Cutoff, y = NDmed, colour = Expt)) +
   scale_colour_manual(values = colour_palette) +
-  lims(y = c(NA, 120)) +
+  lims(y = c(NA, 200)) +
   theme_minimal()
 miscr::output_plot(
   list(plot = node_degrees_close_up, 
@@ -211,8 +212,8 @@ all_components <- ggplot(knn_long, aes(x = kNN, y = nodes, colour = Expt)) +
 miscr::output_plot(
   list(plot = all_components, 
        filename = file.path(plot_dir, "knn-stats-all-components.pdf")),
-  width = 9.6,
-  height = 2.4
+  width = 12,
+  height = 4.75
 )
 
 node_degrees <- ggplot(data = knn_stats) +
@@ -288,6 +289,16 @@ facetted_histograms <- function(degree_df) {
     scale_fill_manual(values = colour_palette) +
     theme_minimal()
 
+  out_file <- file.path(
+    plot_dir, paste(method, "stats-node-degree-distribution.pdf",
+                    sep = "-")
+  )
+  miscr::output_plot(
+    list(plot = node_degree_distribution, 
+         filename = out_file),
+    width = 12,
+    height = 4.75
+  )
   node_degree_distribution_close_up <- 
     ggplot(data = degree_df, aes(x = degree, fill = Expt)) +
     geom_histogram(binwidth = 10, boundary = 1, show.legend = FALSE) +
@@ -302,13 +313,15 @@ facetted_histograms <- function(degree_df) {
     theme_minimal()
   
   out_file <- file.path(
-    plot_dir, paste(method, "stats-node-degree-distribution.pdf",
+    plot_dir, paste(method, "stats-node-degree-distribution-close-up.pdf",
                     sep = "-")
   )
-  pdf(file = out_file, width = 12, height = 4.8)
-  print(node_degree_distribution)
-  print(node_degree_distribution_close_up)
-  invisible(dev.off())
+  miscr::output_plot(
+    list(plot = node_degree_distribution_close_up, 
+         filename = out_file),
+    width = 12,
+    height = 4.75
+  )
 }
 
 # cor stats
@@ -319,3 +332,24 @@ node_degree_data |>
 node_degree_data |>
   dplyr::filter(Method == "knn") |>
   facetted_histograms()
+
+zmp_ph71_t44 <- node_degree_data |>
+  dplyr::filter(Method == "cor", Expt == "zmp_ph71", Threshold == 44)
+med_degree <- dplyr::filter(zmp_ph71_t44, degree > 0) |> 
+  pull(degree) |> median()
+zmp_ph71_t44_hist <- zmp_ph71_t44 |>
+  ggplot(aes(x = degree, fill = Expt)) +
+  geom_histogram(binwidth = 10, boundary = 1, show.legend = FALSE) +
+  geom_vline(xintercept = med_degree,
+             colour = "black") +
+  geom_vline(xintercept = 100, linetype = "dashed",
+             colour = "firebrick3") +
+  scale_fill_manual(values = colour_palette) +
+  theme_minimal()
+
+miscr::output_plot(
+  list(plot = zmp_ph71_t44_hist, 
+       filename = file.path("plots", "zmp_ph71-t44-cor-stats-node-degree-distribution.pdf")),
+  width = 12,
+  height = 4.75
+)
