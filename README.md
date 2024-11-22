@@ -63,6 +63,7 @@ cd nf
 ln -s $HOME/checkouts/zmp-network/qsub qsub
 ln -s $HOME/checkouts/zmp-network/scripts scripts
 ln -s $HOME/checkouts/zmp-network/nextflow.config nextflow.config
+ln -s $HOME/checkouts/zmp-network/bin bin
 ```
 
 Run with testing set to true
@@ -810,4 +811,19 @@ qsub -m bea -M bty114@qmul.ac.uk qsub/run-nextflow.sh -d \
 
 # or with no reports
 qsub qsub/run-nextflow.sh -d -o "$options" -r current scripts/main.nf
+```
+
+Write script to get GO annotation
+```
+# Download script from uge repo
+cd $basedir/nf/bin
+wget https://github.com/richysix/uge-job-scripts/raw/e5f5faad28b23ff55419726beef3675f9e5fdba3/get-go-annotation.sh
+chmod a+x get-go-annotation.sh 
+cd $basedir/nf/
+mkdir reference
+cd reference/
+../bin/get-go-annotation.sh -e 109 -s danio_rerio
+```
+
+```
 ```
