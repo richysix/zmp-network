@@ -14,6 +14,8 @@ log.info """\
   Inflation Params: ${params.inflationParams}
 """
 
+include { GET_GO_ANNOTATION } from './modules/local/get_go_annotation/main'
+
 def get_threshold(m) {
     def t
     if (m[0][1] == "t") {
@@ -224,7 +226,7 @@ process CLUSTER {
     script:
     Integer inflationSuffix = inflation * 10
     """
-    mkdir ${dir}
+    mkdir -p ${dir}
 
     module load MCL/${params.mclVersion}
     mcl $mci_file -I $inflation -o $dir/${mci_file}.I${inflationSuffix}
@@ -260,7 +262,9 @@ process GBA {
     script:
     matches = (mci_file =~ /all-tpm-(t?)(\d*)-?(k?)(\d*).mcx$/)
     t_num = get_threshold(matches)
-    println t_num
+    if (params.debug){
+        println("GBA: Threshold value = " + t_num)
+    }
     """
     mkdir -p ${dir}
     cluster_base=\$( basename $cluster_file )
@@ -321,22 +325,6 @@ process GBA_SUMMARY {
     """
 }
 
-// process ANNOTATION {
-//     label 'retry'
-//     publishDir "reference", pattern: "*"
-
-//     input:
-//     tuple val(go_url)
-
-//     output:
-//     tuple path(go_annotation)
-
-//     script:
-//     """
-//     wget $params.GO_URL
-//     """
-// }
-
 process ENRICHMENT {
     label 'retry'
     publishDir "results", pattern: "*/GO/*"
@@ -364,7 +352,7 @@ process ENRICHMENT {
         echo "No clusters to test!" > ${dir}/GO/done.txt
     else
         module load R/$params.RVersion
-        module load topgo-wrapper/$params.EnsemblVersion
+        module load topgo-wrapper/$params.EnsemblVersionGO
         for file in \${cluster_base}.cluster-*
         do
             cluster_out=\$( basename -s '.tsv' \$file )
@@ -382,7 +370,7 @@ process ENRICHMENT {
 }
 
 workflow {
-
+    // Subset counts file to expts
     subset_output_ch = SUBSET(params.expts, params.all_counts)
     expts_file = subset_output_ch
         .flatMap { it[0] }
@@ -402,6 +390,7 @@ workflow {
         files_by_expt.view { x -> "Expt name, sample and count files: $x" }
     }
 
+    // Create a network for each expt
     orig_ch = CREATE_BASE_NETWORK(files_by_expt)
     expt_tab_ch = orig_ch.map { [it[0], it[2]]}
     cor_hist_ch = orig_ch.map { it[6] }
@@ -415,6 +404,7 @@ workflow {
         mci_ch.view { x -> "Expt name + mcx file: $x" }
     }
 
+    // Test a range fo filtering parameters
     stats_ch = TEST_PARAMETERS(mci_ch)
         .map { [it[1], it[2]] }
         .collect()
@@ -422,6 +412,7 @@ workflow {
         stats_ch.view { x -> "Stats files: $x" }
     }
 
+    // Filter networks by Correlation threshold or knn or both
     if (params.threshold) {
         threshold_params_ch = channel.value(params.threshold)
         filter_cor_ch = FILTER_COR(mci_ch, threshold_params_ch)
@@ -450,24 +441,40 @@ workflow {
 
     filtered_stats_ch = filtered_ch.map { it[2] }
         .collect()
-        
+    
+    // Collect up filtering stats and plot some graphs
     FILTER_STATS(expts_file, cor_hist_ch, stats_ch, filtered_stats_ch)
     if ( params.debug ) {
         filtered_stats_ch.view { x -> "Stats files from Filter processes: $x" }
     }
 
     if (params.clustering) {
+        // check if GO annotation file exists
+        go_annotation_file = file(params.GOFile)
+        if (go_annotation_file.exists()) {
+            go_file_ch = Channel.of(go_annotation_file)
+            if ( params.debug ) {
+                println("GO annotation file exists")
+                go_file_ch.view { x -> "GO annotation file: $x" }
+            }
+        } else {
+            go_file_ch = GET_GO_ANNOTATION(params.Species, params.EnsemblVersionGO)
+            if ( params.debug ) {
+                println("GO annotation file does NOT exist. Downloading...")
+                go_file_ch.view { x -> "GO annotation file: $x" }
+            }
+        }
 
+        // Cluster filtered networks
         infl_values_ch = channel.value(params.inflationParams)
         cluster_ch = CLUSTER(filtered_ch, infl_values_ch)
 
+        // Run Guilt-by-Association on clustered networks
         tab_ch = expt_tab_ch.cross(cluster_ch)
             .map { [it[0][0], it[0][1], it[1][1], it[1][2] ] }
-        
         annotation_ch = channel.value(params.AnnotationFile)
-        go_annotation_ch = channel.value(params.GOFile)
         zfa_annotation_ch = channel.value(params.ZFAFile)
-        gba_ch = GBA(tab_ch, annotation_ch, go_annotation_ch,
+        gba_ch = GBA(tab_ch, annotation_ch, go_file_ch,
                        zfa_annotation_ch)
 
         if ( params.debug ) {
@@ -476,17 +483,18 @@ workflow {
             gba_ch.view { x -> "Graph output files: $x" }
         }
 
+        // Run GO enrichment on the clusters from the networks
         nodes_ch = gba_ch
             .map( { [it[0], it[1], it[3]] } )
-        enrich_ch = ENRICHMENT(nodes_ch, go_annotation_ch)
+        enrich_ch = ENRICHMENT(nodes_ch, go_file_ch)
 
+        // Collect GBA stats and plot some graphs
         auc_stats_ch = gba_ch
             .map( { it[5] } )
             .collect()
         cluster_sizes_ch = cluster_ch
             .map { it[4][3] }
             .collect()
-
         gba_summary_ch = GBA_SUMMARY(expts_file, auc_stats_ch, cluster_sizes_ch)
 
         if ( params.debug ) {
