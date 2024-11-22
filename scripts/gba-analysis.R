@@ -4,26 +4,26 @@ library('optparse')
 
 option_list <- list(
   make_option(
-    "--samples_file", type="character",
-    default="/data/scratch/bty114/detct/grcz11/expt-sample-condition-test.tsv", 
-    help="Name of the overall samples file [default %default]" 
+    "--samples_file", type = "character",
+    default = "/data/scratch/bty114/detct/grcz11/expt-sample-condition-test.tsv", 
+    help = "Name of the overall samples file [default %default]" 
   ),
-  make_option(c("-d", "--debug"), action="store_true", default=FALSE,
-              help="Print extra output [default %default]")
+  make_option(c("-d", "--debug"), action = "store_true", default = FALSE,
+              help = "Print extra output [default %default]")
 )
 
 desc <- paste('Script to create overview plots for GBA analysis', sep = "\n")
 
 cmd_line_args <- parse_args(
   OptionParser(
-    option_list=option_list,
+    option_list = option_list,
     description = desc,
     usage = "Usage: %prog [options]" ),
   positional_arguments = 0
 )
 
 packages <- c('tidyverse')
-for( package in packages ){
+for (package in packages) {
     suppressPackageStartupMessages( suppressWarnings( library(package, character.only = TRUE) ) )
 }
 
@@ -53,9 +53,6 @@ sample_counts <- read_tsv(cmd_line_args$options$samples_file, show_col_types = F
   )
 colour_palette <- biovisr::cbf_palette(sample_counts$expt,
                                        named = TRUE)
-
-sample_counts |> 
-  arrange(n)
 
 ## AUC VALUES
 # function to summarise AUC values
