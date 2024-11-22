@@ -54,6 +54,10 @@ sample_counts <- read_tsv(cmd_line_args$options$samples_file, show_col_types = F
 colour_palette <- biovisr::cbf_palette(sample_counts$expt,
                                        named = TRUE)
 
+sample_counts |> 
+  arrange(n)
+
+## AUC VALUES
 # function to summarise AUC values
 summarise_auc <- function(filename) {
   expt <- str_remove(filename, "-all-tpm.*$")
@@ -109,6 +113,7 @@ miscr::output_plot(
   height = 4.8
 )
 
+# CLUSTER SIZES
 # function to load cluster size data
 load_cluster_sizes <- function(filename) {
   # parse filename for info
@@ -211,7 +216,7 @@ facetted_ecdf <- function(dat) {
     group_by(expt, threshold, inflation, cluster_size) |>
     summarise(
       total_nodes = sum(cluster_size), 
-      .groups = "drop"
+      .groups = "drop_last"
     ) |>
     mutate(
       frac = total_nodes / sum(total_nodes),
@@ -227,9 +232,30 @@ facetted_ecdf <- function(dat) {
     theme_minimal()
 }
 
+ecdf_plot <- function(expt, threshold, dat) {
+  dat <- dat |> 
+    dplyr::filter(expt == {{expt}}, threshold == {{threshold}})
+  dat |>
+    arrange(cluster_size) |>
+    group_by(inflation, cluster_size) |>
+    summarise(
+      total_nodes = sum(cluster_size), 
+      .groups = "drop_last"
+    ) |>
+    mutate(
+      frac = total_nodes / sum(total_nodes),
+      ecdf = cumsum(frac)) |>
+    ggplot(aes(x = cluster_size, y = ecdf, colour = inflation)) +
+    geom_step() +
+    scale_x_log10() +
+    scale_y_continuous(breaks = c(seq(0,1,0.2)), limits = c(0,1), 
+                       labels = scales::label_percent()) +
+    scale_colour_manual(values = biovisr::cbf_palette(factor(cl_size_data$inflation)),
+                        guide = guide_legend(reverse = TRUE)) +
+    labs(title = glue::glue("{expt}, threshold = {threshold}")) +
+    theme_minimal()
+}
 
-dat <- cl_size_data_by_method[["knn"]]
-dat_summary <- cl_size_summary_by_method[["knn"]]
 output_plots <- function(dat, dat_summary, method) {
   pdf(file = file.path(plot_dir, paste0(method, "-clustering-summary-plots.pdf")))
   num_clusters_plot(dat_summary) |> print()
@@ -241,7 +267,12 @@ output_plots <- function(dat, dat_summary, method) {
       x + labs(title = expt)
     }) |> 
     map(print)
+  # facetted ecdf plot
   facetted_ecdf(dat) |> print()
+  # individual plots
+  exp_by_threshold <- expand_grid(expt = levels(dat$expt), threshold = unique(dat$threshold))
+  map2(exp_by_threshold$expt, exp_by_threshold$threshold, ecdf_plot, dat) |> 
+    map(print)
   dev.off()
 }
 
@@ -249,6 +280,43 @@ map(c("knn", "cor"),
     function(x){ 
       output_plots(cl_size_data_by_method[[x]], cl_size_summary_by_method[[x]], x)
     }) |> invisible()
+
+calc_diff <- function(dat_df) {
+  last_below_100 <- dat_df |> 
+    dplyr::filter(cluster_size <= 100) |> 
+    slice_tail(n = 1)
+  last_below_1000 <- dat_df |> 
+    dplyr::filter(cluster_size <= 1000) |> 
+    slice_tail(n = 1)
+  dat_df |> dplyr::select(expt:inflation) |> 
+    slice_head(n = 1) |> 
+    bind_cols(tibble(ecdf_diff = last_below_1000$ecdf - last_below_100$ecdf))
+}
+
+calc_ecdf_diff <- function(dat_df, method) {
+  ecdf_diff <- dat_df |> 
+    arrange(cluster_size) |>
+    group_by(expt, threshold, inflation, cluster_size) |>
+    summarise(
+      total_nodes = sum(cluster_size), 
+      .groups = "drop_last"
+    ) |>
+    mutate(
+      frac = total_nodes / sum(total_nodes),
+      ecdf = cumsum(frac)) %>%
+    split(list(.$expt, .$threshold, .$inflation)) |> 
+    map(calc_diff) |> 
+    list_rbind() |> 
+    arrange(expt, desc(ecdf_diff))
+  
+  write_tsv(ecdf_diff, file = file.path(paste(method, "cluster_ecdf_diff.tsv", sep = "-")))
+}
+
+map(c("knn", "cor"),  
+    function(x){ 
+      calc_ecdf_diff(cl_size_data_by_method[[x]], x)
+    }) |> invisible()
+
 # AUTHOR
 #
 # Richard White <rich@buschlab.org>
