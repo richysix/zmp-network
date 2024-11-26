@@ -12,6 +12,8 @@ process GET_ANNOTATION {
     input:
     val(species)
     val(ensemblVersion)
+    val(scriptURL)
+    val(bashURL)
 
     output:
     path("$outFile")
@@ -22,13 +24,23 @@ process GET_ANNOTATION {
     // convert species to lower case and remove spaces
     """
     # Download get annotation scripts
-    wget $params.getAnnoScriptURL
-    wget $params.getAnnoBashURL
+    wget $scriptURL
+    wget $bashURL
     # make it executable
     chmod a+x get_ensembl_gene_annotation.pl get_ensembl_gene_annotation.sh
     # Run 
     ./get_ensembl_gene_annotation.sh -s "$species" -e $ensemblVersion -o $outFile
     """
+}
+
+// Workflow for testing the GET_ANNOTATION process
+params.GetAnnoScriptURL="https://github.com/iansealy/bio-misc/raw/4e27d60323907d55d37a1ec8f468ca771f542f78/get_ensembl_gene_annotation.pl"
+params.GetAnnoBashURL="https://github.com/richysix/uge-job-scripts/raw/e5f5faad28b23ff55419726beef3675f9e5fdba3/get_ensembl_gene_annotation.sh"
+params.EnsemblVersion="100"
+params.Species='danio_rerio'
+workflow GET_ANNOTATION_WF {
+    GET_ANNOTATION(params.Species, params.EnsemblVersion, params.GetAnnoScriptURL, params.GetAnnoBashURL)
+        .view()
 }
 
 process GET_GO_ANNOTATION {
@@ -38,7 +50,8 @@ process GET_GO_ANNOTATION {
 
     input:
     val(species)
-    val(ensemblVersion)
+    val(ensemblVersionGO)
+    val(bashURL)
 
     output:
     path("*_e*_go.txt")
@@ -47,29 +60,19 @@ process GET_GO_ANNOTATION {
     species_lc_nospace = convert_species_lc_nospace(species)
     """
     # Download get annotation scripts
-    wget $params.getGOAnnoBashURL
+    wget $bashURL
     # make it executable
     chmod a+x get-go-annotation.sh
-    ./get-go-annotation.sh -s $species_lc_nospace -e $ensemblVersion
+    ./get-go-annotation.sh -s $species_lc_nospace -e $ensemblVersionGO
     """
 }
 
-// Workflow for testing the module
+// Workflow for testing the GET_GO_ANNOTATION process
 // nextflow.enable.moduleBinaries = true
-params.getGOAnnoBashURL="https://github.com/richysix/uge-job-scripts/raw/e5f5faad28b23ff55419726beef3675f9e5fdba3/get-go-annotation.sh"
+params.GetGOAnnoBashURL="https://github.com/richysix/uge-job-scripts/raw/e5f5faad28b23ff55419726beef3675f9e5fdba3/get-go-annotation.sh"
 params.EnsemblVersionGO="105"
 workflow GET_GO_ANNOTATION_WF {
-    GET_GO_ANNOTATION(params.Species, params.EnsemblVersionGO)
-        .view()
-}
-
-// Workflow for testing the module
-params.getAnnoScriptURL="https://github.com/iansealy/bio-misc/raw/4e27d60323907d55d37a1ec8f468ca771f542f78/get_ensembl_gene_annotation.pl"
-params.getAnnoBashURL="https://github.com/richysix/uge-job-scripts/raw/e5f5faad28b23ff55419726beef3675f9e5fdba3/get_ensembl_gene_annotation.sh"
-params.EnsemblVersion="100"
-params.Species='Mus musculus'
-workflow GET_ANNOTATION_WF {
-    GET_ANNOTATION(params.Species, params.EnsemblVersion)
+    GET_GO_ANNOTATION(params.Species, params.EnsemblVersionGO, params.GetGOAnnoBashURL)
         .view()
 }
 
