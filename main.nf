@@ -14,7 +14,7 @@ log.info """\
   Inflation Params: ${params.inflationParams}
 """
 
-include { GET_GO_ANNOTATION } from './modules/local/get_go_annotation/main'
+include { GET_ANNO_GET_GO_ANNO } from './subworkflows/local/get_gene_and_go_annotation'
 
 def get_threshold(m) {
     def t
@@ -449,21 +449,17 @@ workflow {
     }
 
     if (params.clustering) {
-        // check if GO annotation file exists
-        go_annotation_file = file(params.GOFile)
-        if (go_annotation_file.exists()) {
-            go_file_ch = Channel.of(go_annotation_file)
-            if ( params.debug ) {
-                println("GO annotation file exists")
-                go_file_ch.view { x -> "GO annotation file: $x" }
-            }
-        } else {
-            go_file_ch = GET_GO_ANNOTATION(params.Species, params.EnsemblVersionGO)
-            if ( params.debug ) {
-                println("GO annotation file does NOT exist. Downloading...")
-                go_file_ch.view { x -> "GO annotation file: $x" }
-            }
-        }
+        // Get annotation if necessary
+        annotation_files = GET_ANNO_GET_GO_ANNO(
+            params.species,
+            [ anno_file: file("reference/danio_rerio-e100-annotation.txt"), 
+            version: params.EnsemblVersion,
+            anno_script_url: params.GetAnnoScriptURL,
+            anno_bash_url: params.GetAnnoBashURL ],
+            [ go_anno_file: file("reference/danio_rerio_e105_go.txt"),
+            go_version: params.EnsemblVersionGO,
+            go_bash_url: params.GetGOAnnoBashURL ]
+        )
 
         // Cluster filtered networks
         infl_values_ch = channel.value(params.inflationParams)
