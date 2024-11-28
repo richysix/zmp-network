@@ -23,7 +23,7 @@ debug=0
 verbose=1
 OUTPUT_DIR=""
 PYTHON_VERSION="3.12.4"
-SCRIPT_DIR="$HOME/checkouts/zmp-network/scripts"
+SCRIPT_DIR="$HOME/checkouts/zmp-network/bin"
 while getopts ":o:p:s:dhqv" opt; do
   case $opt in
     o)  OUTPUT_DIR="--output_dir_prefix $OPTARG" ;;
@@ -45,7 +45,7 @@ module load Python/$PYTHON_VERSION
 if [[ $debug -gt 0 ]]; then
     echo "Python version = $PYTHON_VERSION
 Output Dir = $OUTPUT_DIR
-Script directory: $SCRIPT_DIR
+Script Dir = $SCRIPT_DIR
 Expt file: $1
 Counts file: $2"
 fi
