@@ -11,7 +11,7 @@ log.info """\
   All counts file: ${params.all_counts}
   Threshold params: ${params.threshold}
   KNN params: ${params.knn}
-  Inflation Params: ${params.inflationParams}
+  Inflation Params: ${params.inflation_params}
 """
 
 include { GET_ANNO_GET_GO_ANNO } from './subworkflows/local/get_gene_and_go_annotation'
@@ -45,10 +45,10 @@ process SUBSET {
     )
 
     script:
+    debug = params.debug ? "-d" : ""
     """
-    $params.QsubDir/subset-by-expt.sh -s ${params.ScriptDir} \
-    ${expt_file} ${all_counts_file}
-"""
+    subset-by-expt.sh ${debug} ${expt_file} ${all_counts_file}
+    """
 }
 
 process CREATE_BASE_NETWORK {
@@ -60,46 +60,46 @@ process CREATE_BASE_NETWORK {
 
     output:
     tuple val(expt_dir),
-        path("$expt_dir/all-tpm.tsv"), path("$expt_dir/all-tpm.tab"),
-        path("$expt_dir/all-tpm-orig.mcx"), path("$expt_dir/all-tpm-t20.mcx"),
-        path("$expt_dir/all-tpm-orig.mat.csv.gz"),
-        path("$expt_dir/$expt_dir-all-tpm-orig.cor-hist.txt")
+        path("${expt_dir}/all-tpm.tsv"), path("${expt_dir}/all-tpm.tab"),
+        path("${expt_dir}/all-tpm-orig.mcx"), path("${expt_dir}/all-tpm-t20.mcx"),
+        path("${expt_dir}/all-tpm-orig.mat.csv.gz"),
+        path("${expt_dir}/${expt_dir}-all-tpm-orig.cor-hist.txt")
 
     script:
     """
-    mkdir -p $expt_dir
+    mkdir -p ${expt_dir}
     awk -F"\\t" '{if(NR > 1){ print \$2 "\\t" \$3 }}' \
-     $sample_file > $expt_dir/samples.txt
+     ${sample_file} > ${expt_dir}/samples.txt
 
-    module load R/$params.RVersion
-    Rscript $params.ScriptDir/counts-to-fpkm-tpm.R \
-    --transcripts_file $params.transcriptFile \
-    --output_base $expt_dir/all --output_format tsv \
-    --tpm $expt_dir/samples.txt $count_file
+    module load R/${params.r_version}
+    Rscript ${params.script_dir}/counts-to-fpkm-tpm.R \
+    --transcripts_file $params.transcript_file \
+    --output_base ${expt_dir}/all --output_format tsv \
+    --tpm ${expt_dir}/samples.txt $count_file
 
-    module load MCL/$params.mclVersion
+    module load MCL/$params.mcl_version
 
     # make network with all edges in
-    mcxarray -data $expt_dir/all-tpm.tsv -co 0 \
-    $params.skipRows $params.skipCols \
-    $params.corMeasure $params.labels \
-    --write-binary -o $expt_dir/all-tpm-orig.mcx \
-    -write-tab $expt_dir/all-tpm.tab
+    mcxarray -data ${expt_dir}/all-tpm.tsv -co 0 \
+    $params.skip_rows $params.skip_cols \
+    $params.cor_measure $params.labels \
+    --write-binary -o ${expt_dir}/all-tpm-orig.mcx \
+    -write-tab ${expt_dir}/all-tpm.tab
 
-    mcxdump -imx $expt_dir/all-tpm-orig.mcx \
-    -tab $expt_dir/all-tpm.tab --dump-table \
+    mcxdump -imx ${expt_dir}/all-tpm-orig.mcx \
+    -tab ${expt_dir}/all-tpm.tab --dump-table \
     -digits 3 -sep-field "," -sep-lead "," \
-    -o $expt_dir/all-tpm-orig.mat.csv
-    gzip $expt_dir/all-tpm-orig.mat.csv
+    -o ${expt_dir}/all-tpm-orig.mat.csv
+    gzip ${expt_dir}/all-tpm-orig.mat.csv
 
-    module load Python/$params.PythonVersion
-    python ${params.ScriptDir}/cor-hist.py \
-    $expt_dir/all-tpm-orig.mat.csv.gz $expt_dir/$expt_dir-all-tpm-orig.cor-hist.txt
+    module load Python/$params.python_version
+    python ${params.script_dir}/cor-hist.py \
+    ${expt_dir}/all-tpm-orig.mat.csv.gz ${expt_dir}/${expt_dir}-all-tpm-orig.cor-hist.txt
 
     # Also make one filtered with abs(), gt > 0.2
-    mcx alter -imx $expt_dir/all-tpm-orig.mcx \
+    mcx alter -imx ${expt_dir}/all-tpm-orig.mcx \
     -tf "abs(), gt(0.2)" \
-    --write-binary -o $expt_dir/all-tpm-t20.mcx
+    --write-binary -o ${expt_dir}/all-tpm-t20.mcx
     """
 }
 
@@ -118,7 +118,7 @@ process TEST_PARAMETERS {
 
     script:
     """
-    module load MCL/$params.mclVersion
+    module load MCL/$params.mcl_version
     
     mkdir -p $dir
 
@@ -127,7 +127,7 @@ process TEST_PARAMETERS {
     --output-table > $dir/$dir-all-tpm.cor-stats.tsv
 
     # test varying k-nearest neighbours
-    mcx query -imx ${mci_file} -vary-knn $params.knnTestParams \
+    mcx query -imx ${mci_file} -vary-knn $params.knn_test_params \
     --output-table > $dir/$dir-all-tpm.knn-stats.tsv
     """
 }
@@ -148,7 +148,7 @@ process FILTER_COR {
     script:
     Integer suffix = threshold * 100
     """
-    module load MCL/$params.mclVersion
+    module load MCL/$params.mcl_version
 
     mkdir -p $dir
     mcx alter -imx ${mci_file} \
@@ -176,7 +176,7 @@ process FILTER_KNN {
     threshold=0.2
     thresholdSuffix=20
     """
-    module load MCL/$params.mclVersion
+    module load MCL/$params.mcl_version
 
     mkdir -p $dir
     knnBase="all-tpm-t${thresholdSuffix}-k${knn_threshold}"
@@ -204,8 +204,8 @@ process FILTER_STATS {
 
     script:
     """
-    module load R/$params.RVersion
-    Rscript $params.ScriptDir/edge-filtering-analysis.R \
+    module load R/${params.r_version}
+    Rscript ${params.script_dir}/edge-filtering-analysis.R \
     --samples_file $params.expts
     """
 }
@@ -228,7 +228,7 @@ process CLUSTER {
     """
     mkdir -p ${dir}
 
-    module load MCL/${params.mclVersion}
+    module load MCL/${params.mcl_version}
     mcl $mci_file -I $inflation -o $dir/${mci_file}.I${inflationSuffix}
     
     mci_base=\$( basename $mci_file .mci )
@@ -237,8 +237,8 @@ process CLUSTER {
     clm info --node-all-measures --node-self-measures $mci_file \
     $dir/${mci_file}.I${inflationSuffix} > $dir/${mci_file}.I${inflationSuffix}.stats.tsv
 
-    module load Python/$params.PythonVersion
-    python ${params.ScriptDir}/summarise_clustering.py \
+    module load Python/$params.python_version
+    python ${params.script_dir}/summarise_clustering.py \
     --expt_name $dir $dir/${mci_file}.I${inflationSuffix}
     """
 }
@@ -270,13 +270,13 @@ process GBA {
     cluster_base=\$( basename $cluster_file )
 
     # convert from binary
-    module load MCL/${params.mclVersion}
+    module load MCL/${params.mcl_version}
     mci_base=\$( basename $mci_file .mcx)
     mcx convert $mci_file \${mci_base}.mci
 
     # run convert_mcl script
-    module load Python/$params.PythonVersion
-    python ${params.ScriptDir}/convert_mcl.py \
+    module load Python/$params.python_version
+    python ${params.script_dir}/convert_mcl.py \
     --min_cluster_size 4 --graph_id \${cluster_base} \
     --graphml_file ${dir}/\${cluster_base}.graphml \
     --nodes_file ${dir}/\${cluster_base}.nodes.tsv \
@@ -284,21 +284,21 @@ process GBA {
     --edge_offset ${t_num} \
     \${mci_base}.mci $cluster_file $tab_file $annotation_file
 
-    module load R/$params.RVersion
-    Rscript ${params.ScriptDir}/run-GBA-network.R \
+    module load R/${params.r_version}
+    Rscript ${params.script_dir}/run-GBA-network.R \
     --auc_file ${dir}/${dir}-\${cluster_base}.go.auc.tsv \
     --scores_file ${dir}/\${cluster_base}.go.gene-scores.tsv \
     --plots_file ${dir}/\${cluster_base}.go.GBA-plots.pdf \
-    --min.term.size $params.minTermSize --max.term.size $params.maxTermSize \
+    --min.term.size $params.min_term_size --max.term.size $params.max_term_size \
     ${dir}/\${cluster_base}.nodes.tsv \
     ${dir}/\${cluster_base}.edges.tsv \
     $go_annotation_file
 
-    Rscript ${params.ScriptDir}/run-GBA-network.R \
+    Rscript ${params.script_dir}/run-GBA-network.R \
     --auc_file ${dir}/${dir}-\${cluster_base}.zfa.auc.tsv \
     --scores_file ${dir}/\${cluster_base}.zfa.gene-scores.tsv \
     --plots_file ${dir}/\${cluster_base}.zfa.GBA-plots.pdf \
-    --min.term.size $params.minTermSize --max.term.size $params.maxTermSize \
+    --min.term.size $params.min_term_size --max.term.size $params.max_term_size \
     ${dir}/\${cluster_base}.nodes.tsv \
     ${dir}/\${cluster_base}.edges.tsv \
     $zfa_annotation_file
@@ -319,8 +319,8 @@ process GBA_SUMMARY {
 
     script:
     """
-    module load R/$params.RVersion
-    Rscript ${params.ScriptDir}/gba-analysis.R \
+    module load R/${params.r_version}
+    Rscript ${params.script_dir}/gba-analysis.R \
     --samples_file $params.expts
     """
 }
@@ -342,17 +342,17 @@ process ENRICHMENT {
     # run go enrichment script
     cluster_base=\$( basename $cluster_file )
     
-    module load Python/$params.PythonVersion
-    python ${params.ScriptDir}/create_files_for_topgo.py \
-    --min_cluster_size $params.goMinClusterSize \
+    module load Python/$params.python_version
+    python ${params.script_dir}/create_files_for_topgo.py \
+    --min_cluster_size $params.go_min_cluster_size \
     $nodes_file \$cluster_base
 
     if [[ \$( find ./ -type f -name "\${cluster_base}.cluster-*" | wc -l ) -le 1 ]] ; then
         echo "No clusters to test!"
         echo "No clusters to test!" > ${dir}/GO/done.txt
     else
-        module load R/$params.RVersion
-        module load topgo-wrapper/$params.EnsemblVersionGO
+        module load R/${params.r_version}
+        module load topgo-wrapper/$params.ensembl_versionGO
         for file in \${cluster_base}.cluster-*
         do
             cluster_out=\$( basename -s '.tsv' \$file )
@@ -450,30 +450,32 @@ workflow {
 
     if (params.clustering) {
         // Get annotation if necessary
-        annotation_files = GET_ANNO_GET_GO_ANNO(
+        GET_ANNO_GET_GO_ANNO(
             params.species,
-            [ anno_file: file("reference/danio_rerio-e100-annotation.txt"), 
-            version: params.EnsemblVersion,
-            anno_script_url: params.GetAnnoScriptURL,
-            anno_bash_url: params.GetAnnoBashURL ],
-            [ go_anno_file: file("reference/danio_rerio_e105_go.txt"),
-            go_version: params.EnsemblVersionGO,
-            go_bash_url: params.GetGOAnnoBashURL ]
+            [ anno_file: file(params.annotation_file), 
+            version: params.ensembl_version,
+            anno_script_url: params.get_anno_script_url,
+            anno_bash_url: params.get_anno_bash_url ],
+            [ go_anno_file: file(params.go_annotation_file),
+            go_version: params.ensembl_versionGO,
+            go_bash_url: params.get_go_anno_bash_url ]
         )
-
         // Cluster filtered networks
-        infl_values_ch = channel.value(params.inflationParams)
+        infl_values_ch = channel.value(params.inflation_params)
         cluster_ch = CLUSTER(filtered_ch, infl_values_ch)
 
         // Run Guilt-by-Association on clustered networks
         tab_ch = expt_tab_ch.cross(cluster_ch)
             .map { [it[0][0], it[0][1], it[1][1], it[1][2] ] }
-        annotation_ch = channel.value(params.AnnotationFile)
-        zfa_annotation_ch = channel.value(params.ZFAFile)
+        annotation_ch = GET_ANNO_GET_GO_ANNO.out.anno_file
+        go_file_ch = GET_ANNO_GET_GO_ANNO.out.go_anno_file
+        zfa_annotation_ch = channel.value(params.zfa_file)
         gba_ch = GBA(tab_ch, annotation_ch, go_file_ch,
                        zfa_annotation_ch)
 
         if ( params.debug ) {
+            annotation_ch.view { x -> "Annotation file: $x" }
+            go_file_ch.view { x -> "GO annotation file: $x" }
             cluster_ch.view { x -> "Clustered MCI file: $x" }
             tab_ch.view { x -> "Tab file with clustered MCI file: $x" }
             gba_ch.view { x -> "Graph output files: $x" }

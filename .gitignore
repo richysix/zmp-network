@@ -170,3 +170,4 @@ plots
 
 # Scripts from other repos
 get-go-annotation.sh
+test-include.nf

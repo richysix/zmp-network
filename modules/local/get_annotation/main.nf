@@ -34,12 +34,12 @@ process GET_ANNOTATION {
 }
 
 // Workflow for testing the GET_ANNOTATION process
-params.GetAnnoScriptURL="https://github.com/iansealy/bio-misc/raw/4e27d60323907d55d37a1ec8f468ca771f542f78/get_ensembl_gene_annotation.pl"
-params.GetAnnoBashURL="https://github.com/richysix/uge-job-scripts/raw/e5f5faad28b23ff55419726beef3675f9e5fdba3/get_ensembl_gene_annotation.sh"
-params.EnsemblVersion="100"
-params.Species='danio_rerio'
+params.get_anno_script_url="https://github.com/iansealy/bio-misc/raw/4e27d60323907d55d37a1ec8f468ca771f542f78/get_ensembl_gene_annotation.pl"
+params.get_anno_bash_url="https://github.com/richysix/uge-job-scripts/raw/e5f5faad28b23ff55419726beef3675f9e5fdba3/get_ensembl_gene_annotation.sh"
+params.ensembl_version="100"
+params.species='danio_rerio'
 workflow GET_ANNOTATION_WF {
-    GET_ANNOTATION(params.Species, params.EnsemblVersion, params.GetAnnoScriptURL, params.GetAnnoBashURL)
+    GET_ANNOTATION(params.species, params.ensembl_version, params.get_anno_script_url, params.get_anno_bash_url)
         .view()
 }
 
@@ -69,10 +69,10 @@ process GET_GO_ANNOTATION {
 
 // Workflow for testing the GET_GO_ANNOTATION process
 // nextflow.enable.moduleBinaries = true
-params.GetGOAnnoBashURL="https://github.com/richysix/uge-job-scripts/raw/e5f5faad28b23ff55419726beef3675f9e5fdba3/get-go-annotation.sh"
-params.EnsemblVersionGO="105"
+params.get_go_anno_bash_url="https://github.com/richysix/uge-job-scripts/raw/e5f5faad28b23ff55419726beef3675f9e5fdba3/get-go-annotation.sh"
+params.ensembl_versionGO="105"
 workflow GET_GO_ANNOTATION_WF {
-    GET_GO_ANNOTATION(params.Species, params.EnsemblVersionGO, params.GetGOAnnoBashURL)
+    GET_GO_ANNOTATION(params.species, params.ensembl_versionGO, params.get_go_anno_bash_url)
         .view()
 }
 
