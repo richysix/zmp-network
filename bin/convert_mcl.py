@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
 
 desc = ''' Script to parse an mcl graph to nodes and edges file\n
 

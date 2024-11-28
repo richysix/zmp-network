@@ -55,7 +55,7 @@ if file --mime-type --brief $2 | grep -q 'gzip$'; then
 else
   lines=$( wc -l $2 | awk '{print $1}' )
 fi
-python $SCRIPT_DIR/subset-by-expt.py --infer_schema_length=$lines $OUTPUT_DIR $1 $2
+subset-by-expt.py --infer_schema_length=$lines $OUTPUT_DIR $1 $2
 SUCCESS=$?
 
 verbose=1
