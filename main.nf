@@ -72,7 +72,7 @@ process CREATE_BASE_NETWORK {
      ${sample_file} > ${expt_dir}/samples.txt
 
     module load R/${params.r_version}
-    Rscript ${params.script_dir}/counts-to-fpkm-tpm.R \
+    counts-to-fpkm-tpm.R \
     --transcripts_file $params.transcript_file \
     --output_base ${expt_dir}/all --output_format tsv \
     --tpm ${expt_dir}/samples.txt $count_file
@@ -93,8 +93,8 @@ process CREATE_BASE_NETWORK {
     gzip ${expt_dir}/all-tpm-orig.mat.csv
 
     module load Python/$params.python_version
-    python ${params.script_dir}/cor-hist.py \
-    ${expt_dir}/all-tpm-orig.mat.csv.gz ${expt_dir}/${expt_dir}-all-tpm-orig.cor-hist.txt
+    cor-hist.py ${expt_dir}/all-tpm-orig.mat.csv.gz \
+    ${expt_dir}/${expt_dir}-all-tpm-orig.cor-hist.txt
 
     # Also make one filtered with abs(), gt > 0.2
     mcx alter -imx ${expt_dir}/all-tpm-orig.mcx \
@@ -205,8 +205,7 @@ process FILTER_STATS {
     script:
     """
     module load R/${params.r_version}
-    Rscript ${params.script_dir}/edge-filtering-analysis.R \
-    --samples_file $params.expts
+    edge-filtering-analysis.R --samples_file $params.expts
     """
 }
 
@@ -238,8 +237,8 @@ process CLUSTER {
     $dir/${mci_file}.I${inflationSuffix} > $dir/${mci_file}.I${inflationSuffix}.stats.tsv
 
     module load Python/$params.python_version
-    python ${params.script_dir}/summarise_clustering.py \
-    --expt_name $dir $dir/${mci_file}.I${inflationSuffix}
+    summarise_clustering.py --expt_name $dir \
+    $dir/${mci_file}.I${inflationSuffix}
     """
 }
 
@@ -276,7 +275,7 @@ process GBA {
 
     # run convert_mcl script
     module load Python/$params.python_version
-    python ${params.script_dir}/convert_mcl.py \
+    convert_mcl.py \
     --min_cluster_size 4 --graph_id \${cluster_base} \
     --graphml_file ${dir}/\${cluster_base}.graphml \
     --nodes_file ${dir}/\${cluster_base}.nodes.tsv \
@@ -285,7 +284,7 @@ process GBA {
     \${mci_base}.mci $cluster_file $tab_file $annotation_file
 
     module load R/${params.r_version}
-    Rscript ${params.script_dir}/run-GBA-network.R \
+    run-GBA-network.R \
     --auc_file ${dir}/${dir}-\${cluster_base}.go.auc.tsv \
     --scores_file ${dir}/\${cluster_base}.go.gene-scores.tsv \
     --plots_file ${dir}/\${cluster_base}.go.GBA-plots.pdf \
@@ -294,7 +293,7 @@ process GBA {
     ${dir}/\${cluster_base}.edges.tsv \
     $go_annotation_file
 
-    Rscript ${params.script_dir}/run-GBA-network.R \
+    run-GBA-network.R \
     --auc_file ${dir}/${dir}-\${cluster_base}.zfa.auc.tsv \
     --scores_file ${dir}/\${cluster_base}.zfa.gene-scores.tsv \
     --plots_file ${dir}/\${cluster_base}.zfa.GBA-plots.pdf \
@@ -320,8 +319,7 @@ process GBA_SUMMARY {
     script:
     """
     module load R/${params.r_version}
-    Rscript ${params.script_dir}/gba-analysis.R \
-    --samples_file $params.expts
+    gba-analysis.R --samples_file $params.expts
     """
 }
 
@@ -343,7 +341,7 @@ process ENRICHMENT {
     cluster_base=\$( basename $cluster_file )
     
     module load Python/$params.python_version
-    python ${params.script_dir}/create_files_for_topgo.py \
+    create_files_for_topgo.py \
     --min_cluster_size $params.go_min_cluster_size \
     $nodes_file \$cluster_base
 
@@ -404,7 +402,7 @@ workflow {
         mci_ch.view { x -> "Expt name + mcx file: $x" }
     }
 
-    // Test a range fo filtering parameters
+    // Test a range of filtering parameters
     stats_ch = TEST_PARAMETERS(mci_ch)
         .map { [it[1], it[2]] }
         .collect()
