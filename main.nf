@@ -15,6 +15,7 @@ log.info """\
 """
 
 include { GET_ANNO_GET_GO_ANNO } from './subworkflows/local/get_gene_and_go_annotation'
+include { FILTER_COR } from './modules/local/filter_cor'
 
 def get_threshold(m) {
     def t
@@ -129,34 +130,6 @@ process TEST_PARAMETERS {
     # test varying k-nearest neighbours
     mcx query -imx ${mci_file} -vary-knn $params.knn_test_params \
     --output-table > $dir/$dir-all-tpm.knn-stats.tsv
-    """
-}
-
-// Threshold
-process FILTER_COR {
-    label 'big_mem_retry'
-    publishDir "results", pattern: "*/all-tpm*"
-    
-    input:
-    tuple val(dir), path(mci_file)
-    each threshold
-
-    output:
-    tuple val(dir), path("$dir/*-[t][0-9]*.mcx"),
-        path("$dir/$dir-all-tpm-t*.stats.tsv")
-
-    script:
-    Integer suffix = threshold * 100
-    """
-    module load MCL/$params.mcl_version
-
-    mkdir -p $dir
-    mcx alter -imx ${mci_file} \
-    -tf "gt(${threshold}), add(-${threshold})" \
-    --write-binary -o $dir/all-tpm-t${suffix}.mcx
-    mcx alter -imx $dir/all-tpm-t${suffix}.mcx \
-    -tf "add(${threshold})" | mcx query -imx - > \
-    $dir/$dir-all-tpm-t${suffix}.stats.tsv
     """
 }
 
