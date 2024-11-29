@@ -52,8 +52,9 @@ workflow GET_ANNO_GET_GO_ANNO {
     }
 
     emit:
-    anno_file = ch_anno_file          // channel: [ path(annotation_file) ]
-    go_anno_file = ch_go_anno_file    // channel: [ path(GO_annotation_file) ]
+    // convert to value channels using .first()
+    anno_file = ch_anno_file.first()        // value channel: [ path(annotation_file) ]
+    go_anno_file = ch_go_anno_file.first()  // value channel: [ path(GO_annotation_file) ]
 }
 
 params.get_anno_script_url="https://github.com/iansealy/bio-misc/raw/4e27d60323907d55d37a1ec8f468ca771f542f78/get_ensembl_gene_annotation.pl"
