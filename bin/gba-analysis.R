@@ -8,6 +8,14 @@ option_list <- list(
     default = "/data/scratch/bty114/detct/grcz11/expt-sample-condition-test.tsv", 
     help = "Name of the overall samples file [default %default]" 
   ),
+  make_option(
+    "--min_cluster_size", type = "integer", default = 50, 
+    help = "Lower bound of the range to calculate the max ecdf over [default %default]" 
+  ),
+  make_option(
+    "--max_cluster_size", type = "integer", default = 1000, 
+    help = "Upper bound of the range to calculate the max ecdf over [default %default]" 
+  ),
   make_option(c("-d", "--debug"), action = "store_true", default = FALSE,
               help = "Print extra output [default %default]")
 )
@@ -243,6 +251,10 @@ ecdf_plot <- function(expt, threshold, dat) {
       frac = total_nodes / sum(total_nodes),
       ecdf = cumsum(frac)) |>
     ggplot(aes(x = cluster_size, y = ecdf, colour = inflation)) +
+    geom_vline(xintercept = cmd_line_args$options$min_cluster_size,
+               colour = "firebrick4", alpha = 0.75, linetype = "dashed") +
+    geom_vline(xintercept = cmd_line_args$options$max_cluster_size,
+               colour = "firebrick4", alpha = 0.75, linetype = "dashed") +
     geom_step() +
     scale_x_log10() +
     scale_y_continuous(breaks = c(seq(0,1,0.2)), limits = c(0,1), 
@@ -278,19 +290,16 @@ map(c("knn", "cor"),
       output_plots(cl_size_data_by_method[[x]], cl_size_summary_by_method[[x]], x)
     }) |> invisible()
 
-calc_diff <- function(dat_df) {
-  last_below_100 <- dat_df |> 
-    dplyr::filter(cluster_size <= 100) |> 
-    slice_tail(n = 1)
-  last_below_1000 <- dat_df |> 
-    dplyr::filter(cluster_size <= 1000) |> 
-    slice_tail(n = 1)
+calc_diff <- function(dat_df, min_size, max_size) {
+  lower <- dat_df$ecdf[ dat_df$cluster_size <= min_size ] |> tail(1)
+  upper <- dat_df$ecdf[ dat_df$cluster_size <= max_size ] |> tail(1)
   dat_df |> dplyr::select(expt:inflation) |> 
     slice_head(n = 1) |> 
-    bind_cols(tibble(ecdf_diff = last_below_1000$ecdf - last_below_100$ecdf))
+    bind_cols(tibble(ecdf_diff = upper - lower))
 }
 
-calc_ecdf_diff <- function(dat_df, method) {
+calc_ecdf_diff <- function(dat_df, method, 
+                           min_cl_size = 50, max_cl_size = 1000) {
   ecdf_diff <- dat_df |> 
     arrange(cluster_size) |>
     group_by(expt, threshold, inflation, cluster_size) |>
@@ -302,7 +311,13 @@ calc_ecdf_diff <- function(dat_df, method) {
       frac = total_nodes / sum(total_nodes),
       ecdf = cumsum(frac)) %>%
     split(list(.$expt, .$threshold, .$inflation)) |> 
-    map(calc_diff) |> 
+    map(\(x) {
+      calc_diff(
+        x, 
+        min_size = min_cl_size,
+        max_size = max_cl_size
+      )
+    }) |> 
     list_rbind() |> 
     arrange(expt, desc(ecdf_diff))
   
@@ -311,7 +326,12 @@ calc_ecdf_diff <- function(dat_df, method) {
 
 map(c("knn", "cor"),  
     function(x){ 
-      calc_ecdf_diff(cl_size_data_by_method[[x]], x)
+      calc_ecdf_diff(
+        cl_size_data_by_method[[x]], 
+        x,
+        cmd_line_args$options$min_cluster_size,
+        cmd_line_args$options$max_cluster_size
+      )
     }) |> invisible()
 
 # AUTHOR

@@ -279,7 +279,7 @@ process GBA {
 
 process GBA_SUMMARY {
     label 'retry'
-    publishDir "results", pattern: "plots/*.pdf"
+    publishDir "results", pattern: "{*.tsv,plots/*.pdf}"
 
     input:
     path("expts.txt")
@@ -288,6 +288,7 @@ process GBA_SUMMARY {
 
     output:
     path("plots/*.pdf")
+    tuple path("cor-cluster_ecdf_diff.tsv"), path("knn-cluster_ecdf_diff.tsv")
 
     script:
     """
