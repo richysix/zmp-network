@@ -1,6 +1,9 @@
 process FILTER_COR {
     label 'big_mem_retry'
     publishDir "results", pattern: "*/*all-tpm-t*"
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'https://depot.galaxyproject.org/singularity/mcl:14.137--pl5321hec16e2b_8':
+        'biocontainers/mcl:14.137--0' }"
     
     input:
     tuple val(dir), path(mci_file)
@@ -13,8 +16,6 @@ process FILTER_COR {
     script:
     Integer suffix = threshold * 100
     """
-    module load MCL/$params.mcl_version
-
     mkdir -p $dir
     mcx alter -imx ${mci_file} \
     -tf "gt(${threshold}), add(-${threshold})" \
