@@ -825,5 +825,15 @@ cd reference/
 ../bin/get-go-annotation.sh -e 109 -s danio_rerio
 ```
 
+Update config to use profiles and module/process specific options
 ```
+mkdir conf
+```
+
+Download base nf-core config from Ian's zfvarcall repo as start and edit
+And apocrita config
+```
+cd conf
+wget https://github.com/iansealy/zfvarcall/raw/refs/heads/master/conf/base.config
+wget https://github.com/iansealy/zfvarcall/raw/refs/heads/master/conf/apocrita.config
 ```

@@ -31,7 +31,7 @@ def get_threshold(m) {
 // to each separate experiment
 // see README
 process SUBSET {
-    label 'big_mem_retry'
+    label 'process_high'
     publishDir "results", pattern: "expts.txt"
 
     input: 
@@ -53,7 +53,7 @@ process SUBSET {
 }
 
 process CREATE_BASE_NETWORK {
-    label 'big_mem_retry'
+    label 'process_medium'
     publishDir "results", pattern: "*/*all-tpm*"
 
     input: 
@@ -107,7 +107,7 @@ process CREATE_BASE_NETWORK {
 // Create a basic network with a correlation threshold of 0.2
 // Test varying threshold and knn parameters
 process TEST_PARAMETERS {
-    label 'big_mem_retry'
+    label 'process_medium'
     publishDir "results", pattern: "*/all-tpm*"
     
     input:
@@ -134,7 +134,7 @@ process TEST_PARAMETERS {
 }
 
 process FILTER_KNN {
-    label 'big_mem_retry'
+    label 'process_low'
     publishDir "results", pattern: "*/all-tpm*"
 
     input:
@@ -163,7 +163,7 @@ process FILTER_KNN {
 }
 
 process FILTER_STATS {
-    label 'retry'
+    label 'process_single'
     publishDir "results", pattern: "plots/*.pdf"
 
     input:
@@ -184,7 +184,7 @@ process FILTER_STATS {
 
 // Cluster network
 process CLUSTER {
-    label 'med_mem_retry'
+    label 'process_single'
     publishDir "results", pattern: "*/all-tpm*"
     
     input:
@@ -216,7 +216,7 @@ process CLUSTER {
 }
 
 process GBA {
-    label 'huge_mem_retry'
+    label 'process_high_memory'
     publishDir "results", pattern: "*/all-tpm*.{graphml,tsv,csv,pdf}"
 
     input:
@@ -278,7 +278,7 @@ process GBA {
 }
 
 process GBA_SUMMARY {
-    label 'retry'
+    label 'process_single'
     publishDir "results", pattern: "{*.tsv,plots/*.pdf}"
 
     input:
@@ -298,7 +298,7 @@ process GBA_SUMMARY {
 }
 
 process ENRICHMENT {
-    label 'retry'
+    label 'process_single'
     publishDir "results", pattern: "*/GO/*"
 
     input:

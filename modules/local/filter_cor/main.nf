@@ -1,8 +1,8 @@
 process FILTER_COR {
-    label 'big_mem_retry'
+    label 'process_low'
     publishDir "results", pattern: "*/*all-tpm-t*"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/mcl:14.137--pl5321hec16e2b_8':
+        'https://depot.galaxyproject.org/singularity/mcl:14.137--0':
         'biocontainers/mcl:14.137--0' }"
     
     input:
