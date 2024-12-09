@@ -4,7 +4,6 @@ log.info """\
   NETWORK CONSTRUCTION PIPELINE
   -----------------------------
 
-  Testing: ${params.testing}
   Clustering: ${params.clustering}
   Debug: ${params.debug}
   Expt to sample file: ${params.expts}
@@ -30,7 +29,7 @@ def get_threshold(m) {
 // process to subset the file containing all the samples
 // to each separate experiment
 // see README
-process SUBSET {
+process SUBSET_COUNTS {
     label 'process_high'
     publishDir "results", pattern: "expts.txt"
 
@@ -39,16 +38,25 @@ process SUBSET {
     val all_counts_file
 
     output:
-    tuple(
-        path("expts.txt"),
-        path("*/samples.tsv"),
-        path("*/counts-by-gene.tsv")
-    )
+    path("expts.txt"),               emit: expts_file
+    path("*/samples.tsv"),           emit: sample_files // tuple of sample file names
+    path("*/counts-by-gene.tsv"),    emit: count_files  // tuple of count file names
 
     script:
     debug = params.debug ? "-d" : ""
     """
     subset-by-expt.sh ${debug} ${expt_file} ${all_counts_file}
+    """
+
+    stub:
+    """
+    touch expts.txt
+    for dir in test-1 test-2
+    do
+      mkdir \$dir
+      touch \$dir/samples.tsv
+      touch \$dir/counts-by-gene.tsv
+    done
     """
 }
 
@@ -343,20 +351,21 @@ process ENRICHMENT {
 
 workflow {
     // Subset counts file to expts
-    subset_output_ch = SUBSET(params.expts, params.all_counts)
-    expts_file = subset_output_ch
-        .flatMap { it[0] }
-    sample_files = subset_output_ch
-        .flatMap { it[1] }
+    SUBSET_COUNTS(params.expts, params.all_counts)
+    // extract expt name from path to use as join key
+    // it.parent.baseName gets final directory name (e.g. test-1 from /work/78/810e9b6891dd6476b1474a90983952/test-1/samples.tsv)
+    sample_files = SUBSET_COUNTS.out.sample_files
+        .flatten()
         .map { [ it.parent.baseName, it ]}
-    count_files = subset_output_ch
-        .flatMap { it[2] }
+    // extract expt name from path to use as join key
+    count_files = SUBSET_COUNTS.out.count_files
+        .flatten()
         .map { [ it.parent.baseName, it ]}
+    // join sample files to count files by expt name
     files_by_expt = sample_files.join(count_files)
 
     if ( params.debug ) {
-        subset_output_ch.view { x -> "Subset output: $x" }
-        expts_file.view { x -> "Expts file: $x"}
+        SUBSET_COUNTS.out.expts_file.view { x -> "Expts file: $x"}
         sample_files.view { x -> "Expt name + sample file: $x"}
         count_files.view { x -> "Expt name + count file: $x"}
         files_by_expt.view { x -> "Expt name, sample and count files: $x" }
