@@ -60,55 +60,60 @@ process SUBSET_COUNTS {
     """
 }
 
+// Create correlation network containing all edges
+// Also create one, removing edges abs() < 0.2 for testing cut-off parameters
+// in TEST_PARAMETERS (smaller to load into memory)
 process CREATE_BASE_NETWORK {
     label 'process_medium'
-    publishDir "results", pattern: "*/*all-tpm*"
 
     input: 
-    tuple val(expt_dir), path(sample_file), path(count_file)
+    tuple val(expt), path(sample_file), path(count_file)
 
     output:
-    tuple val(expt_dir),
-        path("${expt_dir}/all-tpm.tsv"), path("${expt_dir}/all-tpm.tab"),
-        path("${expt_dir}/all-tpm-orig.mcx"), path("${expt_dir}/all-tpm-t20.mcx"),
-        path("${expt_dir}/all-tpm-orig.mat.csv.gz"),
-        path("${expt_dir}/${expt_dir}-all-tpm-orig.cor-hist.txt")
+    tuple val(expt), path("${expt}-all-tpm.tsv"),                   emit: tpms_file
+    tuple val(expt), path("${expt}-all-tpm.tab"),                   emit: tab_file // mapping of node ids to Ensembl gene ids
+    tuple val(expt), path("${expt}-all-tpm-orig.mcx"),              emit: base_network
+    tuple val(expt), path("${expt}-all-tpm-t20.mcx"),               emit: filtered_network
+    // tuple val(expt), path("${expt}/all-tpm-orig.mat.csv.gz"),    emit: network_matrix
+    tuple val(expt), path("${expt}-all-tpm-orig.cor-hist.txt"),     emit: cor_hist
 
     script:
     """
-    mkdir -p ${expt_dir}
     awk -F"\\t" '{if(NR > 1){ print \$2 "\\t" \$3 }}' \
-     ${sample_file} > ${expt_dir}/samples.txt
+     ${sample_file} > ${expt}-samples.txt
 
     module load R/${params.r_version}
     counts-to-fpkm-tpm.R \
     --transcripts_file $params.transcript_file \
-    --output_base ${expt_dir}/all --output_format tsv \
-    --tpm ${expt_dir}/samples.txt $count_file
+    --output_base ${expt}-all --output_format tsv \
+    --tpm ${expt}-samples.txt $count_file
 
     module load MCL/$params.mcl_version
 
     # make network with all edges in
-    mcxarray -data ${expt_dir}/all-tpm.tsv -co 0 \
+    mcxarray -data ${expt}-all-tpm.tsv -co 0 \
     $params.skip_rows $params.skip_cols \
     $params.cor_measure $params.labels \
-    --write-binary -o ${expt_dir}/all-tpm-orig.mcx \
-    -write-tab ${expt_dir}/all-tpm.tab
+    --write-binary -o ${expt}-all-tpm-orig.mcx \
+    -write-tab ${expt}-all-tpm.tab
 
-    mcxdump -imx ${expt_dir}/all-tpm-orig.mcx \
-    -tab ${expt_dir}/all-tpm.tab --dump-table \
-    -digits 3 -sep-field "," -sep-lead "," \
-    -o ${expt_dir}/all-tpm-orig.mat.csv
-    gzip ${expt_dir}/all-tpm-orig.mat.csv
-
-    module load Python/$params.python_version
-    cor-hist.py ${expt_dir}/all-tpm-orig.mat.csv.gz \
-    ${expt_dir}/${expt_dir}-all-tpm-orig.cor-hist.txt
+    # make histogram of correlation values
+    mcx query -imx ${expt}-all-tpm-orig.mcx \
+    -values-hist -1/1/20 \
+    -o ${expt}-all-tpm-orig.cor-hist.txt
 
     # Also make one filtered with abs(), gt > 0.2
-    mcx alter -imx ${expt_dir}/all-tpm-orig.mcx \
+    mcx alter -imx ${expt}-all-tpm-orig.mcx \
     -tf "abs(), gt(0.2)" \
-    --write-binary -o ${expt_dir}/all-tpm-t20.mcx
+    --write-binary -o ${expt}-all-tpm-t20.mcx
+    """
+
+    stub:
+    """
+    mkdir -p ${expt}
+    touch ${expt}-all-tpm.tsv ${expt}-all-tpm.tab \
+    ${expt}-all-tpm-orig.mcx ${expt}-all-tpm-t20.mcx \
+    ${expt}-all-tpm-orig.cor-hist.txt
     """
 }
 

@@ -9,8 +9,6 @@ option_list <- list(
               help="TxDb file [default %default]"),
   make_option("--gtf_file", action="store", default="../reference/grcz11/Danio_rerio.GRCz11.111.gtf",
               help="GTF annotation file [default %default]"),
-  make_option("--qorts_file", action="store", default="../qorts/output/summary.table.txt",
-              help="QoRTs summary file [default %default]"),
   make_option("--fpkm", action="store_true", default=FALSE,
               help="Create and output fpkm [default %default]"),
   make_option("--tpm", action="store_true", default=TRUE,
@@ -117,16 +115,6 @@ assays(dds, withDimnames = FALSE)[["avgTxLength"]] <-
 
 rnaseq_fpkm <- fpkm(dds)
 rownames(rnaseq_fpkm) <- rowData(dds)$GeneID
-
-# # get InsertSize_Mean from QoRTs output
-# qortsSummary <- read.table(cmd_line_args$options$qorts_file, sep="\t", 
-#                            header=TRUE, row.names = 1)
-# insertSizes <- unlist(qortsSummary["InsertSize_Mean",])
-# 
-# # match up sample names
-# names(insertSizes) <- sub("^X", "", names(insertSizes)) |> 
-#   (\(x) gsub("\\.", "-", x))()
-# insertSizes <- insertSizes[ rownames(colData(dds)) ]
 
 # calculate tpm from fpkm
 fpkm_to_tpm <- function(fpkm) {
