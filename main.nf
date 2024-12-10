@@ -255,33 +255,40 @@ process FILTER_STATS {
 // Cluster network
 process CLUSTER {
     label 'process_single'
-    publishDir "results", pattern: "*/all-tpm*"
     
     input:
-    tuple val(dir), path(mci_file), path(stats_file)
+    tuple val(dir), path(mci_file)
     each inflation
 
     output:
-    tuple val(dir), path(mci_file), path("*/*.mcx.I[0-9][0-9]"),
-        path("*/*.mcx.I[0-9][0-9].stats.tsv"), path("*/*.mcx.I[0-9][0-9].cl*")
+    tuple val(dir), path(mci_file), path("${mci_file}.I[0-9][0-9]"),     emit: clustering
+    path("${mci_file}.I[0-9][0-9].cl-sizes.tsv"),                        emit: cluster_sizes
+    tuple path("${mci_file}.I[0-9][0-9].stats.tsv"),
+        path("${mci_file}.I[0-9][0-9].info.txt"),                        emit: stats
 
     script:
     Integer inflationSuffix = inflation * 10
+    def file_base = "${mci_file}.I${inflationSuffix}"
     """
-    mkdir -p ${dir}
-
     module load MCL/${params.mcl_version}
-    mcl $mci_file -I $inflation -o $dir/${mci_file}.I${inflationSuffix}
-    
-    mci_base=\$( basename $mci_file .mci )
-    clm info $mci_file $dir/${mci_file}.I${inflationSuffix} >> $dir/\${mci_base}.info.txt
+    mcl ${mci_file} -I ${inflation} -o ${file_base}
+
+    clm info ${mci_file} ${file_base} >> ${file_base}.info.txt
 
     clm info --node-all-measures --node-self-measures $mci_file \
-    $dir/${mci_file}.I${inflationSuffix} > $dir/${mci_file}.I${inflationSuffix}.stats.tsv
+    ${file_base} > ${file_base}.stats.tsv
 
-    module load Python/$params.python_version
-    summarise_clustering.py --expt_name $dir \
-    $dir/${mci_file}.I${inflationSuffix}
+    module load Python/${params.python_version}
+    summarise_clustering.py ${file_base}
+    """
+
+    stub:
+    Integer inflationSuffix = inflation * 10
+    def mci_cluster_file = "${dir}/${mci_file}.I${inflationSuffix}"
+    """
+    mkdir -p ${dir}
+    touch ${mci_cluster_file} ${dir}-${mci_cluster_file}.stats.tsv \
+    ${dir}-${dir}-${mci_cluster_file}.cl-sizes.tsv
     """
 }
 
@@ -496,45 +503,27 @@ workflow {
             go_version: params.ensembl_versionGO,
             go_bash_url: params.get_go_anno_bash_url ]
         )
+        if ( params.debug ) {
+            GET_ANNO_GET_GO_ANNO.out.anno_file.view { x -> "Annotation file: $x" }
+            GET_ANNO_GET_GO_ANNO.out.go_anno_file.view { x -> "GO annotation file: $x" }
+        }
+
         // Cluster filtered networks
         infl_values_ch = channel.value(params.inflation_params)
-        cluster_ch = CLUSTER(filtered_ch, infl_values_ch)
-
-        // Run Guilt-by-Association on clustered networks
-        tab_ch = expt_tab_ch.cross(cluster_ch)
-            .map { [it[0][0], it[0][1], it[1][1], it[1][2] ] }
-        annotation_ch = GET_ANNO_GET_GO_ANNO.out.anno_file
-        go_file_ch = GET_ANNO_GET_GO_ANNO.out.go_anno_file
-        zfa_annotation_ch = channel.value(params.zfa_file)
-        gba_ch = GBA(tab_ch, annotation_ch, go_file_ch,
-                       zfa_annotation_ch)
-
+        CLUSTER(
+            filtered_ch,    // [ expt_name, filtered_mci_file ]
+            infl_values_ch  // inflation
+        )
         if ( params.debug ) {
-            annotation_ch.view { x -> "Annotation file: $x" }
-            go_file_ch.view { x -> "GO annotation file: $x" }
-            cluster_ch.view { x -> "Clustered MCI file: $x" }
-            tab_ch.view { x -> "Tab file with clustered MCI file: $x" }
-            gba_ch.view { x -> "Graph output files: $x" }
+            CLUSTER.out.clustering.view { x -> "Clustered MCI file: $x" }
+            CLUSTER.out.cluster_sizes.view { x -> "Cluster size files: $x" }
+            CLUSTER.out.stats.view { x -> "Clustering stats files: $x" }
         }
 
-        // Run GO enrichment on the clusters from the networks
-        nodes_ch = gba_ch
-            .map( { [it[0], it[1], it[3]] } )
-        enrich_ch = ENRICHMENT(nodes_ch, go_file_ch)
-
-        // Collect GBA stats and plot some graphs
-        auc_stats_ch = gba_ch
-            .map( { it[5] } )
-            .collect()
-        cluster_sizes_ch = cluster_ch
-            .map { it[4][3] }
-            .collect()
-        gba_summary_ch = GBA_SUMMARY(expts_file, auc_stats_ch, cluster_sizes_ch)
-
-        if ( params.debug ) {
-            auc_stats_ch.view { x -> "AUC files: $x" }
-            cluster_sizes_ch.view { x -> "Cluster sizes files: $x" }
-            gba_summary_ch.view { x -> "GBA summary plot files: $x" }
-        }
+        // join tab file to CLUSTER clustering output channel by expt name
+        tab_ch = CREATE_BASE_NETWORK.out.tab_file
+            .join(CLUSTER.out.clustering)
+            .view { x -> "Clustered file with tab file: $x" }
+        
     }
 }
