@@ -6,7 +6,7 @@ log.info """\
 
   Clustering: ${params.clustering}
   Debug: ${params.debug}
-  Expt to sample file: ${params.expts}
+  Expt to sample file: ${params.samples}
   All counts file: ${params.all_counts}
   Threshold params: ${params.threshold}
   KNN params: ${params.knn}
@@ -33,7 +33,7 @@ process SUBSET_COUNTS {
     publishDir "results", pattern: "expts.txt"
 
     input: 
-    val expt_file
+    val sample_file
     val all_counts_file
 
     output:
@@ -44,7 +44,7 @@ process SUBSET_COUNTS {
     script:
     debug = params.debug ? "-d" : ""
     """
-    subset-by-expt.sh ${debug} ${expt_file} ${all_counts_file}
+    subset-by-expt.sh ${debug} ${sample_file} ${all_counts_file}
     """
 
     stub:
@@ -416,11 +416,27 @@ process ENRICHMENT {
         done
     fi
     """
+
+    stub:
+    """
+    mkdir -p ${dir}/GO
+    for cluster in \$( seq 5 )
+    do
+      go_dir=${dir}/GO/${cluster_file}.cluster-\$cluster
+      mkdir \$go_dir
+      for domain in BP MF CC
+      do
+        touch \$go_dir/\$domain.all.genes.tsv \$go_dir/\$domain.all.tsv \
+        \$go_dir/\$domain.pdf \$go_dir/\$domain.sig.genes.tsv \
+        \$go_dir/\$domain.sig.tsv
+      done
+    done
+    """
 }
 
 workflow {
     // Subset counts file to expts
-    SUBSET_COUNTS(params.expts, params.all_counts)
+    SUBSET_COUNTS(params.samples, params.all_counts)
     // extract expt name from path to use as join key
     // it.parent.baseName gets final directory name (e.g. test-1 from /work/78/810e9b6891dd6476b1474a90983952/test-1/samples.tsv)
     sample_files = SUBSET_COUNTS.out.sample_files
