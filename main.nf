@@ -14,7 +14,6 @@ log.info """\
 """
 
 include { GET_ANNO_GET_GO_ANNO } from './subworkflows/local/get_gene_and_go_annotation'
-include { FILTER_COR } from './modules/local/filter_cor'
 
 def get_threshold(m) {
     def t
@@ -147,6 +146,42 @@ process TEST_PARAMETERS {
     """
 }
 
+// Filter network by correlation threshold using MCL
+process FILTER_COR {
+    label 'process_low'
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'https://depot.galaxyproject.org/singularity/mcl:14.137--0':
+        'biocontainers/mcl:14.137--0' }"
+    
+    input:
+    tuple val(dir), path(mci_file)
+    each threshold
+
+    output:
+    tuple val(dir), path("${dir}-all-tpm-t[0-9]*.mcx"),     emit: filtered_mci
+    path("${dir}-all-tpm-t[0-9]*.stats.tsv"),               emit: node_stats
+
+    script:
+    Integer suffix = threshold * 100
+    """
+    mcx alter -imx ${mci_file} \
+    -tf "gt(${threshold}), add(-${threshold})" \
+    --write-binary -o ${dir}-all-tpm-t${suffix}.mcx
+    mcx alter -imx ${dir}-all-tpm-t${suffix}.mcx \
+    -tf "add(${threshold})" | mcx query -imx - > \
+    ${dir}-all-tpm-t${suffix}.stats.tsv
+    """
+
+    stub:
+    Integer suffix = threshold * 100
+    def mci = "${dir}-all-tpm-t${suffix}.mcx"
+    def stats = "${dir}-all-tpm-t${suffix}.stats.tsv"
+    """
+    touch ${mci} ${stats}
+    """
+}
+
+// Filter network by K-nearest-neighbours using MCL
 process FILTER_KNN {
     label 'process_low'
     publishDir "results", pattern: "*/all-tpm*"
@@ -384,17 +419,11 @@ workflow {
     TEST_PARAMETERS(CREATE_BASE_NETWORK.out.filtered_network)
     // Make a list of all the vary threshold stats files
     stats_ch = TEST_PARAMETERS.out.vary_threshold_stats.collect()
-    if ( params.debug ) {
-        stats_ch.view { x -> "Vary threshold stats files: $x" }
-    }
 
     // Filter networks by Correlation threshold or knn or both
     if (params.threshold) {
         threshold_params_ch = channel.value(params.threshold)
-        filter_cor_ch = FILTER_COR(mci_ch, threshold_params_ch)
-        if ( params.debug ) {
-            filter_cor_ch.view { x -> "Filtered network files: $x" }
-        }
+        FILTER_COR(CREATE_BASE_NETWORK.out.base_network, threshold_params_ch)
     }
     if (params.knn) {
         knn_params_ch = channel.value(params.knn)
