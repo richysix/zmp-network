@@ -121,28 +121,30 @@ process CREATE_BASE_NETWORK {
 // Test varying threshold and knn parameters
 process TEST_PARAMETERS {
     label 'process_medium'
-    publishDir "results", pattern: "*/all-tpm*"
-    
+
     input:
     tuple val(dir), path(mci_file)
 
     output:
-    tuple val(dir), path("$dir/$dir-all-tpm.cor-stats.tsv"),
-        path("$dir/$dir-all-tpm.knn-stats.tsv")
+    tuple path("$dir-all-tpm.vary-cor-stats.tsv"),
+        path("$dir-all-tpm.vary-knn-stats.tsv"),     emit: vary_threshold_stats
 
     script:
     """
     module load MCL/$params.mcl_version
-    
-    mkdir -p $dir
 
     # vary correlation
     mcx query -imx ${mci_file} --vary-correlation \
-    --output-table > $dir/$dir-all-tpm.cor-stats.tsv
+    --output-table > ${dir}-all-tpm.vary-cor-stats.tsv
 
     # test varying k-nearest neighbours
     mcx query -imx ${mci_file} -vary-knn $params.knn_test_params \
-    --output-table > $dir/$dir-all-tpm.knn-stats.tsv
+    --output-table > ${dir}-all-tpm.vary-knn-stats.tsv
+    """
+
+    stub:
+    """
+    touch $dir-all-tpm.vary-cor-stats.tsv $dir-all-tpm.vary-knn-stats.tsv
     """
 }
 
@@ -377,25 +379,14 @@ workflow {
     }
 
     // Create a network for each expt
-    orig_ch = CREATE_BASE_NETWORK(files_by_expt)
-    expt_tab_ch = orig_ch.map { [it[0], it[2]]}
-    cor_hist_ch = orig_ch.map { it[6] }
-        .collect()
-    mci_ch = orig_ch
-        .map { [it[0], it[4]] }
-    
-    if ( params.debug ) {
-        orig_ch.view { x -> "Base network output files: $x" }
-        cor_hist_ch.view { x -> "Correlation histogram files: $x"}
-        mci_ch.view { x -> "Expt name + mcx file: $x" }
-    }
+    CREATE_BASE_NETWORK(files_by_expt)
 
     // Test a range of filtering parameters
-    stats_ch = TEST_PARAMETERS(mci_ch)
-        .map { [it[1], it[2]] }
-        .collect()
+    TEST_PARAMETERS(CREATE_BASE_NETWORK.out.filtered_network)
+    // Make a list of all the vary threshold stats files
+    stats_ch = TEST_PARAMETERS.out.vary_threshold_stats.collect()
     if ( params.debug ) {
-        stats_ch.view { x -> "Stats files: $x" }
+        stats_ch.view { x -> "Vary threshold stats files: $x" }
     }
 
     // Filter networks by Correlation threshold or knn or both
