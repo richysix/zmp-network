@@ -184,15 +184,14 @@ process FILTER_COR {
 // Filter network by K-nearest-neighbours using MCL
 process FILTER_KNN {
     label 'process_low'
-    publishDir "results", pattern: "*/all-tpm*"
 
     input:
     tuple val(dir), path(mci_file)
     each knn_threshold
 
     output:
-    tuple val(dir), path("$dir/*-[k][0-9]*.mcx"),
-        path("$dir/$dir-all-tpm-t*-k*.stats.tsv")
+    tuple val(dir), path("${dir}-all-tpm-t[0-9]*-k[0-9]*.mcx"), emit: filtered_mci
+    path("${dir}-all-tpm-t[0-9]*-k[0-9]*.stats.tsv"),           emit: node_stats
 
     script:
     threshold=0.2
@@ -200,14 +199,20 @@ process FILTER_KNN {
     """
     module load MCL/$params.mcl_version
 
-    mkdir -p $dir
-    knnBase="all-tpm-t${thresholdSuffix}-k${knn_threshold}"
+    knnBase="${dir}-all-tpm-t${thresholdSuffix}-k${knn_threshold}"
     mcx alter -imx ${mci_file} \
     -tf "abs(), gt(${threshold}), add(-${threshold}), #knn($knn_threshold)" \
-    --write-binary -o $dir/\${knnBase}.mcx
+    --write-binary -o \${knnBase}.mcx
     # stats
-    mcx alter -imx $dir/\${knnBase}.mcx -tf "add(${threshold})" | \
-    mcx query -imx - > $dir/$dir-\${knnBase}.stats.tsv
+    mcx alter -imx \${knnBase}.mcx -tf "add(${threshold})" | \
+    mcx query -imx - > \${knnBase}.stats.tsv
+    """
+
+    stub:
+    def mci = "${dir}-all-tpm-t20-k${knn_threshold}.mcx"
+    def stats = "${dir}-all-tpm-t20-k${knn_threshold}.stats.tsv"
+    """
+    touch ${mci} ${stats}
     """
 }
 
@@ -427,21 +432,20 @@ workflow {
     }
     if (params.knn) {
         knn_params_ch = channel.value(params.knn)
-        filter_knn_ch = FILTER_KNN(mci_ch, knn_params_ch)
-        if ( params.debug ) {
-            filter_knn_ch.view { x -> "Filtered network files: $x" }
-        }
-    }
-    if (params.threshold && params.knn) {
-        filtered_ch = filter_cor_ch.concat(filter_knn_ch)
-    } else if (params.threshold) {
-        filtered_ch = filter_cor_ch
-    } else {
-        filtered_ch = filter_knn_ch
+        FILTER_KNN(CREATE_BASE_NETWORK.out.base_network, knn_params_ch)
     }
 
-    if ( params.debug ) {
-        filtered_ch.view { x -> "MCI files to cluster: $x" }
+    // If both cor and knn have been run, concat the two channels together
+    // Else the new channels are whichever one was run
+    if (params.threshold && params.knn) {
+        filtered_ch = FILTER_COR.out.filtered_mci.concat(FILTER_KNN.out.filtered_mci)
+        filtered_stats_ch = FILTER_COR.out.node_stats.concat(FILTER_KNN.out.node_stats)
+    } else if (params.threshold) {
+        filtered_ch = FILTER_COR.out.filtered_mci
+        filtered_stats_ch = FILTER_COR.out.node_stats
+    } else {
+        filtered_ch = FILTER_KNN.out.filtered_mci
+        filtered_stats_ch = FILTER_KNN.out.node_stats
     }
 
     filtered_stats_ch = filtered_ch.map { it[2] }
@@ -450,7 +454,12 @@ workflow {
     // Collect up filtering stats and plot some graphs
     FILTER_STATS(expts_file, cor_hist_ch, stats_ch, filtered_stats_ch)
     if ( params.debug ) {
-        filtered_stats_ch.view { x -> "Stats files from Filter processes: $x" }
+        // Filtered network files for clustering
+        filtered_ch.view { x -> "Filtered network files: $x" }
+        // Files for FILTER_STATS
+        filtered_stats_ch.collect().view { x -> "Node stats from filtering: $x" }
+        CREATE_BASE_NETWORK.out.cor_hist.collect().view { x -> "Cor histogram files: $x" }
+        stats_ch.view { x -> "Vary threshold stats files: $x" }
     }
 
     if (params.clustering) {
