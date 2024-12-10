@@ -221,18 +221,34 @@ process FILTER_STATS {
     publishDir "results", pattern: "plots/*.pdf"
 
     input:
-    path("expts.txt")
-    path("*")
-    path("*")
-    path("*")
+    path("expts.txt")   // list of expt names
+    path(sample_file)   // samples file
+    path("*")           // correlation histogram files
+    path("*")           // vary threshold stats files
+    path("*")           // node stats after filtering
 
     output:
-    path("plots/*.pdf")
+    path("plots/*.pdf"), emit: plots
 
     script:
     """
     module load R/${params.r_version}
-    edge-filtering-analysis.R --samples_file $params.expts
+    edge-filtering-analysis.R --samples_file $sample_file
+    """
+
+    stub:
+    """
+    mkdir -p plots/
+    touch plots/all-cor-dist.pdf plots/cor-stats-node-degrees-close-up.pdf \
+    plots/knn-stats-all-components.pdf
+    for method in cor knn 
+    do
+      touch plots/\$method-stats-singletons.pdf plots/\$method-stats-nodes.pdf \
+      plots/\$method-stats-nodes-singletons.pdf \
+      plots/\$method-stats-node-degrees.pdf \
+      plots/\$method-stats-node-degree-distribution.pdf \
+      plots/\$method-stats-node-degree-distribution-close-up.pdf
+    done
     """
 }
 
@@ -422,8 +438,6 @@ workflow {
 
     // Test a range of filtering parameters
     TEST_PARAMETERS(CREATE_BASE_NETWORK.out.filtered_network)
-    // Make a list of all the vary threshold stats files
-    stats_ch = TEST_PARAMETERS.out.vary_threshold_stats.collect()
 
     // Filter networks by Correlation threshold or knn or both
     if (params.threshold) {
@@ -439,27 +453,35 @@ workflow {
     // Else the new channels are whichever one was run
     if (params.threshold && params.knn) {
         filtered_ch = FILTER_COR.out.filtered_mci.concat(FILTER_KNN.out.filtered_mci)
-        filtered_stats_ch = FILTER_COR.out.node_stats.concat(FILTER_KNN.out.node_stats)
+        filtered_stats_ch = FILTER_COR.out.node_stats
+            .concat(FILTER_KNN.out.node_stats)
+            .collect()
     } else if (params.threshold) {
         filtered_ch = FILTER_COR.out.filtered_mci
-        filtered_stats_ch = FILTER_COR.out.node_stats
+        filtered_stats_ch = FILTER_COR.out.node_stats.collect()
     } else {
         filtered_ch = FILTER_KNN.out.filtered_mci
-        filtered_stats_ch = FILTER_KNN.out.node_stats
+        filtered_stats_ch = FILTER_KNN.out.node_stats.collect()
     }
 
-    filtered_stats_ch = filtered_ch.map { it[2] }
-        .collect()
-    
-    // Collect up filtering stats and plot some graphs
-    FILTER_STATS(expts_file, cor_hist_ch, stats_ch, filtered_stats_ch)
+    // Plot some graphs from the stats files
+    // Collect together stats files
+    cor_hist_ch = CREATE_BASE_NETWORK.out.cor_hist.collect()
+    stats_ch = TEST_PARAMETERS.out.vary_threshold_stats.collect()
+    FILTER_STATS(
+        SUBSET_COUNTS.out.expts_file,
+        params.samples,
+        cor_hist_ch,
+        stats_ch,
+        filtered_stats_ch
+    )
     if ( params.debug ) {
         // Filtered network files for clustering
         filtered_ch.view { x -> "Filtered network files: $x" }
         // Files for FILTER_STATS
-        filtered_stats_ch.collect().view { x -> "Node stats from filtering: $x" }
-        CREATE_BASE_NETWORK.out.cor_hist.collect().view { x -> "Cor histogram files: $x" }
+        cor_hist_ch.view { x -> "Cor histogram files: $x" }
         stats_ch.view { x -> "Vary threshold stats files: $x" }
+        filtered_stats_ch.view { x -> "Node stats from filtering: $x" }
     }
 
     if (params.clustering) {

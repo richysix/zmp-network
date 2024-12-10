@@ -5,7 +5,7 @@ library('optparse')
 option_list <- list(
   make_option(
     "--samples_file", type = "character",
-    default = "/data/home/bty114/checkouts/zmp-network/data/expt-sample-condition-initial.tsv", 
+    default = "expt-sample-condition-initial.tsv", 
     help = "Name of the overall samples file [default %default]" 
   ),
   make_option("--debug", type = "logical", default = FALSE, action = "store_true",
@@ -40,8 +40,12 @@ load_cor_hist <- function(expt_name) {
   filename <- file.path(paste(expt_name, "all-tpm-orig.cor-hist.txt", sep = "-"))
   read_tsv(
     filename, show_col_types = FALSE,
-    col_names = c("bin_start", "bin_end", "count")
-  ) |> mutate(expt = expt_name)
+    col_names = c("bin_end", "count")
+  ) |> 
+    mutate(
+      bin_start = bin_end - 0.1,
+      expt = expt_name
+    )
 }
 
 # find all expt names
@@ -91,143 +95,118 @@ miscr::output_plot(
   height = 8
 )
 
-load_stats <- function(expt, file) {
-  filename <- file.path(paste(expt, file, sep = "-"))
-  read_tsv(filename, show_col_types = FALSE) |> 
-    mutate(Expt = expt)
-}
  # L       Percentage of nodes in the largest component
  # D       Percentage of nodes in components of size at most 3 [-div option]
  # R       Percentage of nodes not in L or D: 100 - L -D
  # S       Percentage of nodes that are singletons
  # E       Fraction of edges retained (input graph has 87883982)
+load_stats <- function(expt, file) {
+  filename <- file.path(paste(expt, file, sep = "-"))
+  read_tsv(filename, show_col_types = FALSE) |> 
+    mutate(Expt = expt)
+}
 
-cor_stats <- map(expts$expt, \(x) load_stats(x, "all-tpm.cor-stats.tsv")) |> 
-  list_rbind() |>
-  mutate(Expt = fct_relevel(Expt, levels(sample_counts$expt)))
+node_stats_plots <- function(stats_df, method) {
+  plot_list <- list()
+  filename_base <- file.path(plot_dir, method)
+  singletons <- ggplot(data = stats_df) +
+    geom_point(aes(x = Cutoff, y = S, colour = Expt)) +
+    scale_colour_manual(values = colour_palette) +
+    ylab("Singletons") +
+    theme_minimal()
+  miscr::output_plot(
+    list(plot = singletons,
+         filename = paste0(filename_base, '-stats-singletons.pdf'))
+  )
 
-singletons <- ggplot(data = cor_stats) +
-  geom_point(aes(x = Cutoff, y = S, colour = Expt)) +
-  scale_colour_manual(values = colour_palette) +
-  ylab("Singletons") +
-  theme_minimal()
+  nodes <- ggplot(data = stats_df) +
+    geom_point(aes(x = Cutoff, y = L, colour = Expt)) +
+    scale_colour_manual(values = colour_palette) +
+    ylab("Connected Nodes") +
+    theme_minimal()
+  miscr::output_plot(
+    list(plot = nodes,
+         filename = paste0(filename_base, '-stats-nodes.pdf'))
+  )
+  miscr::add_to_plot_list(
+    plot_list,
+    nodes,
+    filename = paste0(filename_base, '-stats-nodes.pdf')
+  )
+  
+  combined_plot <- nodes + singletons + plot_layout(guides = 'collect')
+  miscr::output_plot(
+    list(plot = combined_plot, 
+         filename = paste0(filename_base, "-stats-nodes-singletons.pdf")),
+    width = 12, height = 4.75
+  )
 
-miscr::output_plot(
-  list(plot = singletons, 
-       filename = file.path(plot_dir, "cor-stats-singletons.pdf"))
-)
+  node_degrees <- ggplot(data = stats_df) +
+    geom_hline(yintercept = 100, colour = "firebrick3", linetype = "dashed") +
+    geom_pointrange(aes(x = Cutoff, y = NDmed, ymin = NDmed - NDiqr/2, 
+                        ymax = NDmed + NDiqr/2, colour = Expt)) +
+    scale_colour_manual(values = colour_palette) +
+    theme_minimal()
+  miscr::output_plot(
+    list(plot = node_degrees, 
+         filename = paste0(filename_base, "-stats-node-degrees.pdf")),
+    width = 9.6,
+  )
+  
+  node_degrees_close_up <- ggplot(data = stats_df) +
+    geom_hline(yintercept = 100, colour = "firebrick3", linetype = "dashed") +
+    geom_point(aes(x = Cutoff, y = NDmed, colour = Expt)) +
+    scale_colour_manual(values = colour_palette) +
+    lims(y = c(NA, 200)) +
+    theme_minimal()
+  miscr::output_plot(
+    list(plot = node_degrees_close_up, 
+         filename = paste0(filename_base, "-stats-node-degrees-close-up.pdf")),
+    width = 9.6,
+  )
+  all_components_plot(cor_stats, method)
+}
 
-nodes <- ggplot(data = cor_stats) +
-  geom_point(aes(x = Cutoff, y = L, colour = Expt)) +
-  scale_colour_manual(values = colour_palette) +
-  ylab("Connected Nodes") +
-  theme_minimal()
-miscr::output_plot(
-  list(plot = nodes, filename = file.path(plot_dir, "cor-stats-nodes.pdf"))
-)
-
-combined_plot <- nodes + singletons + plot_layout(guides = 'collect')
-miscr::output_plot(
-  list(plot = combined_plot, 
-       filename = file.path(plot_dir, "cor-stats-nodes-singletons.pdf")),
-  width = 12, height = 4.75
-)
-
-node_degrees <- ggplot(data = cor_stats) +
-  geom_hline(yintercept = 100, colour = "firebrick3", linetype = "dashed") +
-  geom_pointrange(aes(x = Cutoff, y = NDmed, ymin = NDmed - NDiqr/2, 
-                      ymax = NDmed + NDiqr/2, colour = Expt)) +
-  scale_colour_manual(values = colour_palette) +
-  theme_minimal()
-miscr::output_plot(
-  list(plot = node_degrees, 
-       filename = file.path(plot_dir, "cor-stats-node-degrees.pdf")),
-  width = 9.6,
-)
-node_degrees_close_up <- ggplot(data = cor_stats) +
-  geom_hline(yintercept = 100, colour = "firebrick3", linetype = "dashed") +
-  geom_point(aes(x = Cutoff, y = NDmed, colour = Expt)) +
-  scale_colour_manual(values = colour_palette) +
-  lims(y = c(NA, 200)) +
-  theme_minimal()
-miscr::output_plot(
-  list(plot = node_degrees_close_up, 
-       filename = file.path(plot_dir, "cor-stats-node-degrees-close-up.pdf")),
-  width = 9.6,
-)
-
-# KNN stats
-knn_stats <- map(expts$expt,
-                 \(x) load_stats(x, "all-tpm.knn-stats.tsv")) |> 
-  list_rbind()
-
-singletons <- ggplot(data = knn_stats) +
-  geom_point(aes(x = kNN, y = S, colour = Expt)) +
-  scale_colour_manual(values = colour_palette) +
-  scale_x_reverse() +
-  ylab("Singletons") +
-  theme_minimal()
-miscr::output_plot(
-  list(plot = singletons, 
-       filename = file.path(plot_dir, "knn-stats-singletons.pdf")),
-)
-
-nodes <- ggplot(data = knn_stats) +
-  geom_point(aes(x = kNN, y = L, colour = Expt)) +
-  scale_colour_manual(values = colour_palette) +
-  scale_x_reverse() +
-  ylab("Connected Nodes") +
-  theme_minimal()
-miscr::output_plot(
-  list(plot = nodes, 
-       filename = file.path(plot_dir, "knn-stats-nodes.pdf")),
-)
-
-combined_plot <- nodes + singletons + plot_layout(guides = 'collect')
-miscr::output_plot(
-  list(plot = combined_plot, 
-       filename = file.path(plot_dir, "knn-stats-nodes-singletons.pdf")),
-  width = 9.6
-)
-
-knn_long <- knn_stats |> 
-  dplyr::select(L:S, kNN, Expt) |> 
-  pivot_longer(-c(Expt, kNN), names_to = "category", values_to = "nodes") |> 
-  mutate(category = factor(category, levels = c("L", "D", "S", "R")))
-
-categories <- c(
+all_components_plot <- function(stats_df, method) {
+  stats_long <- stats_df |> 
+    dplyr::select(L:S, Cutoff, Expt) |> 
+    pivot_longer(-c(Expt, Cutoff), names_to = "category", values_to = "nodes") |> 
+    mutate(category = factor(category, levels = c("L", "D", "S", "R")))
+  
+  categories <- c(
     L = "Largest Component",
     S = "Singletons",
     R = "Remainder",
     D = "Disconnected"
-)
-all_components <- ggplot(knn_long, aes(x = kNN, y = nodes, colour = Expt)) +
-  geom_point() +
-  facet_wrap(vars(category), nrow = 1, scales = "free_y",
-             labeller = labeller(category = categories)) +
-  scale_colour_manual(values = colour_palette) +
-  scale_x_reverse() +
-  theme_minimal()
+  )
+  all_components <- ggplot(stats_long, aes(x = Cutoff, y = nodes, colour = Expt)) +
+    geom_point() +
+    facet_wrap(vars(category), nrow = 1, scales = "free_y",
+               labeller = labeller(category = categories)) +
+    scale_colour_manual(values = colour_palette) +
+    scale_x_reverse() +
+    theme_minimal()
+  
+  filename_base <- file.path(plot_dir, method)
+  miscr::output_plot(
+    list(plot = all_components, 
+         filename = paste0(filename_base, "-stats-all-components.pdf")),
+    width = 12,
+    height = 4.75
+  )
+}
 
-miscr::output_plot(
-  list(plot = all_components, 
-       filename = file.path(plot_dir, "knn-stats-all-components.pdf")),
-  width = 12,
-  height = 4.75
-)
+cor_stats <- map(expts$expt, \(x) load_stats(x, "all-tpm.vary-cor-stats.tsv")) |>
+  list_rbind() |>
+  mutate(Expt = fct_relevel(Expt, levels(sample_counts$expt)))
+node_stats_plots(cor_stats, "cor")
 
-node_degrees <- ggplot(data = knn_stats) +
-  geom_hline(yintercept = 100, colour = "firebrick3", linetype = "dashed") +
-  geom_pointrange(aes(x = kNN, y = NDmed, ymin = NDmed - NDiqr/2, 
-                      ymax = NDmed + NDiqr/2, colour = Expt)) +
-  scale_colour_manual(values = colour_palette) +
-  scale_x_reverse() +
-  theme_minimal()
-miscr::output_plot(
-  list(plot = node_degrees, 
-       filename = file.path(plot_dir, "knn-stats-node-degrees.pdf")),
-  width = 9.6
-)
+# KNN stats
+knn_stats <- map(expts$expt,
+                 \(x) load_stats(x, "all-tpm.vary-knn-stats.tsv")) |> 
+  list_rbind() |> 
+  rename(Cutoff = kNN)
+node_stats_plots(knn_stats, "knn")
 
 load_node_degrees <- function(filename) {
   method <- ifelse(grepl("all-tpm-t[0-9]+-k[0-9]+", filename), "knn", "cor")
@@ -329,27 +308,7 @@ node_degree_data |>
   dplyr::filter(Method == "cor") |>
   facetted_histograms()
 
+# knn
 node_degree_data |>
   dplyr::filter(Method == "knn") |>
   facetted_histograms()
-
-zmp_ph71_t44 <- node_degree_data |>
-  dplyr::filter(Method == "cor", Expt == "zmp_ph71", Threshold == 44)
-med_degree <- dplyr::filter(zmp_ph71_t44, degree > 0) |> 
-  pull(degree) |> median()
-zmp_ph71_t44_hist <- zmp_ph71_t44 |>
-  ggplot(aes(x = degree, fill = Expt)) +
-  geom_histogram(binwidth = 10, boundary = 1, show.legend = FALSE) +
-  geom_vline(xintercept = med_degree,
-             colour = "black") +
-  geom_vline(xintercept = 100, linetype = "dashed",
-             colour = "firebrick3") +
-  scale_fill_manual(values = colour_palette) +
-  theme_minimal()
-
-miscr::output_plot(
-  list(plot = zmp_ph71_t44_hist, 
-       filename = file.path("plots", "zmp_ph71-t44-cor-stats-node-degree-distribution.pdf")),
-  width = 12,
-  height = 4.75
-)
