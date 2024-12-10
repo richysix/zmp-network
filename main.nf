@@ -70,12 +70,11 @@ process CREATE_BASE_NETWORK {
     tuple val(expt), path(sample_file), path(count_file)
 
     output:
-    tuple val(expt), path("${expt}-all-tpm.tsv"),                   emit: tpms_file
-    tuple val(expt), path("${expt}-all-tpm.tab"),                   emit: tab_file // mapping of node ids to Ensembl gene ids
-    tuple val(expt), path("${expt}-all-tpm-orig.mcx"),              emit: base_network
-    tuple val(expt), path("${expt}-all-tpm-t20.mcx"),               emit: filtered_network
-    // tuple val(expt), path("${expt}/all-tpm-orig.mat.csv.gz"),    emit: network_matrix
-    tuple val(expt), path("${expt}-all-tpm-orig.cor-hist.txt"),     emit: cor_hist
+    tuple val(expt), path("${expt}-all-tpm.tsv"),       emit: tpms_file
+    tuple val(expt), path("${expt}-all-tpm.tab"),       emit: tab_file // mapping of node ids to Ensembl gene ids
+    tuple val(expt), path("${expt}-all-tpm-orig.mcx"),  emit: base_network
+    tuple val(expt), path("${expt}-all-tpm-t20.mcx"),   emit: filtered_network
+    path("${expt}-all-tpm-orig.cor-hist.txt"),          emit: cor_hist
 
     script:
     """
