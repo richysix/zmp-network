@@ -385,41 +385,44 @@ process GBA_SUMMARY {
     """
 }
 
-process ENRICHMENT {
+process RUN_GO_ENRICHMENT {
     label 'process_single'
-    publishDir "results", pattern: "*/GO/*"
 
     input:
-    tuple val(dir), path(cluster_file), path(nodes_file)
+    tuple val(dir), path(cluster_file), path(graphml_file),
+        path(nodes_file), path(edges_file)
     path(go_annotation_file)
 
     output:
-    tuple val(dir), path(nodes_file), path("*/GO/*")
+    tuple val(dir), path(cluster_file), path("${cluster_file}.GO/*"), emit: go_output
 
     script:
+    if (params.debug){
+        println("RUN_GO_ENRICHMENT: Name of cluster file is ${cluster_file}")
+    }
     """
-    mkdir -p ${dir}/GO
-    # run go enrichment script
-    cluster_base=\$( basename $cluster_file )
+    mkdir -p ${cluster_file}.GO
     
-    module load Python/$params.python_version
+    # run script to create input files
+    module load Python/${params.python_version}
     create_files_for_topgo.py \
-    --min_cluster_size $params.go_min_cluster_size \
-    $nodes_file \$cluster_base
+    --min_cluster_size ${params.go_min_cluster_size} \
+    ${nodes_file} ${cluster_file}
 
-    if [[ \$( find ./ -type f -name "\${cluster_base}.cluster-*" | wc -l ) -le 1 ]] ; then
+    # run go enrichment script
+    if [[ \$( find ./ -type f -name "${cluster_file}.cluster-*" | wc -l ) -le 1 ]] ; then
         echo "No clusters to test!"
-        echo "No clusters to test!" > ${dir}/GO/done.txt
+        echo "No clusters to test!" > ${cluster_file}.GO/done.txt
     else
         module load R/${params.r_version}
-        module load topgo-wrapper/$params.ensembl_versionGO
-        for file in \${cluster_base}.cluster-*
+        module load topgo-wrapper/${params.ensembl_versionGO}
+        for file in ${cluster_file}.cluster-*
         do
             cluster_out=\$( basename -s '.tsv' \$file )
             echo \$cluster_out
-            run_topgo.pl --input_file \${cluster_base}.all.tsv \
+            run_topgo.pl --input_file ${cluster_file}.all.tsv \
             --genes_of_interest_file \$file \
-            --dir ${dir}/GO/\$cluster_out \
+            --dir ${cluster_file}.GO/\$cluster_out \
             --gene_field 3 \
             --name_field 4 \
             --description_field 5 \
@@ -430,10 +433,10 @@ process ENRICHMENT {
 
     stub:
     """
-    mkdir -p ${dir}/GO
+    mkdir -p ${cluster_file}.GO
     for cluster in \$( seq 5 )
     do
-      go_dir=${dir}/GO/${cluster_file}.cluster-\$cluster
+      go_dir=${cluster_file}.GO/${cluster_file}.cluster-\$cluster
       mkdir \$go_dir
       for domain in BP MF CC
       do
@@ -558,11 +561,20 @@ workflow {
             channel.value(params.zfa_file)          // [ ZFA_annotation_file ]
         )
 
+        // Run GO enrichment on the clusters from the networks
+        // Uses the nodes file output from RUN_GUILT_BY_ASSOCIATION
+        RUN_GO_ENRICHMENT(
+            RUN_GUILT_BY_ASSOCIATION.out.graph_files,
+            GET_ANNO_GET_GO_ANNO.out.go_anno_file
+        )
+
         if ( params.debug ) {
             tab_ch.view { x -> "Tab file with clustered MCI file: $x" }
             RUN_GUILT_BY_ASSOCIATION.out.graph_files.view { x -> "Graph output files: $x" }
             RUN_GUILT_BY_ASSOCIATION.out.auc_files.collect().view { x -> "AUC output files: $x" }
             RUN_GUILT_BY_ASSOCIATION.out.gba_out.view { x -> "GBA output files: $x" }
+
+            RUN_GO_ENRICHMENT.out.go_output.view { x -> "GO_ENRICHMENT output files: $x" }
             // publish_ch = gba_ch
             //     .map { [ it[0], it[2], it[3], it[4], it[5], it[6], it[7] ] }
             //     .join(cluster_ch)
