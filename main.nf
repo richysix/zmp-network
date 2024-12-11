@@ -365,23 +365,41 @@ process RUN_GUILT_BY_ASSOCIATION {
     """
 }
 
-process GBA_SUMMARY {
+process RUN_POST_GBA_STATS {
     label 'process_single'
-    publishDir "results", pattern: "{*.tsv,plots/*.pdf}"
+    publishDir "results", pattern: "plots/*.pdf"
+    publishDir "results", pattern: "*.{tsv,html}"
 
     input:
-    path("expts.txt")
-    path("*")
-    path("*")
+    path("expts.txt")   // list of expt names
+    path(sample_file)   // samples file
+    path("*")           // GBA AUC output files
+    path("*")           // CLUSTER cluster size files
 
     output:
-    path("plots/*.pdf")
-    tuple path("cor-cluster_ecdf_diff.tsv"), path("knn-cluster_ecdf_diff.tsv")
+    path("plots/*.pdf"),                    emit: plots
+    tuple path("top_ecdf_diff.tsv"),
+        path("cor-cluster_ecdf_diff.tsv"),
+        path("knn-cluster_ecdf_diff.tsv"),  emit: tsv
+    path("top_ecdf_diff_table-*.html"),     emit: html
 
     script:
     """
     module load R/${params.r_version}
-    gba-analysis.R --samples_file $params.expts
+    post-gba-analysis.R --samples_file ${sample_file}
+    """
+
+    stub:
+    """
+    mkdir -p plots
+    touch \
+      top_ecdf_diff.tsv \
+      cor-cluster_ecdf_diff.tsv \
+      knn-cluster_ecdf_diff.tsv \
+      top_ecdf_diff_table-100-1000.html \
+      plots/auc-diff.pdf \
+      plots/cor-clustering-summary-plots.pdf \
+      plots/knn-clustering-summary-plots.pdf
     """
 }
 
@@ -561,6 +579,13 @@ workflow {
             channel.value(params.zfa_file)          // [ ZFA_annotation_file ]
         )
 
+        RUN_POST_GBA_STATS(
+            SUBSET_COUNTS.out.expts_file,
+            params.samples,
+            RUN_GUILT_BY_ASSOCIATION.out.auc_files.collect(),
+            CLUSTER_NETWORK.out.cluster_sizes.collect()
+        )
+
         // Run GO enrichment on the clusters from the networks
         // Uses the nodes file output from RUN_GUILT_BY_ASSOCIATION
         RUN_GO_ENRICHMENT(
@@ -575,6 +600,10 @@ workflow {
             RUN_GUILT_BY_ASSOCIATION.out.gba_out.view { x -> "GBA output files: $x" }
 
             RUN_GO_ENRICHMENT.out.go_output.view { x -> "GO_ENRICHMENT output files: $x" }
+
+            RUN_POST_GBA_STATS.out.plots.view { x -> "RUN_POST_GBA_STATS plots: $x" }
+            RUN_POST_GBA_STATS.out.tsv.view { x -> "RUN_POST_GBA_STATS tsv files: $x" }
+            RUN_POST_GBA_STATS.out.html.view { x -> "RUN_POST_GBA_STATS html files: $x" }
             // publish_ch = gba_ch
             //     .map { [ it[0], it[2], it[3], it[4], it[5], it[6], it[7] ] }
             //     .join(cluster_ch)

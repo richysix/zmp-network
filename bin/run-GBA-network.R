@@ -47,11 +47,12 @@ show_cols <- cmd_line_args$options$debug
 nodes <- read_tsv(cmd_line_args$args[1], show_col_types = show_cols)
 if (nrow(nodes) == 0) {
   message("The graph has no nodes. Skipping GBA analysis")
-  file.create(
-    cmd_line_args$options$auc_file,
-    cmd_line_args$options$scores_file,
-    cmd_line_args$options$plots_file
-  )
+  # create dummy files
+  glue::glue("TermID", "auc", "avg_node_degree", "degree_null_auc", .sep = "\t") |>
+    writeLines(con = cmd_line_args$options$auc_file, sep = "\n")
+  glue::glue("TermID", "auc", "avg_node_degree", "degree_null_auc", .sep = "\t") |>
+    writeLines(con = cmd_line_args$options$scores_file, sep = "\n")
+  file.create(cmd_line_args$options$plots_file)
   quit(save = "no", status = 0)
 }
 

@@ -5,11 +5,11 @@ library('optparse')
 option_list <- list(
   make_option(
     "--samples_file", type = "character",
-    default = "/data/scratch/bty114/detct/grcz11/expt-sample-condition-test.tsv", 
+    default = "expt-sample-condition-test.tsv", 
     help = "Name of the overall samples file [default %default]" 
   ),
   make_option(
-    "--min_cluster_size", type = "integer", default = 50, 
+    "--min_cluster_size", type = "integer", default = 100, 
     help = "Lower bound of the range to calculate the max ecdf over [default %default]" 
   ),
   make_option(
@@ -30,7 +30,7 @@ cmd_line_args <- parse_args(
   positional_arguments = 0
 )
 
-packages <- c('tidyverse')
+packages <- c('tidyverse', 'gt')
 for (package in packages) {
     suppressPackageStartupMessages( suppressWarnings( library(package, character.only = TRUE) ) )
 }
@@ -102,6 +102,24 @@ auc_data <- auc_files |>
   arrange(desc(threshold_method), threshold) |> 
   mutate(params = factor(params, levels = unique(params)))
 
+dodge <- position_dodge(width = 0.75)
+auc_line_points <- auc_data |> 
+  pivot_longer(cols = c(mean_auc, mean_null_auc)) |> 
+  ggplot(mapping = aes(
+    x = params,
+    y = value,
+    colour = inflation,
+    shape = name,
+    group = interaction(params, inflation)
+  )) +
+  geom_point(position = dodge) +
+  geom_line(position = dodge, show.legend = FALSE) +
+  facet_grid(rows = vars(domain), cols = vars(expt),
+             labeller = labeller(domain = \(x) toupper(x))) +
+  scale_colour_manual(values = biovisr::cbf_palette(factor(auc_data$inflation)),
+                  labels = divide_by_10) +
+  scale_shape_discrete(name = "Value", labels = c("Mean AUC", "Mean null AUC"))
+  
 auc_diff <- ggplot(data = auc_data) +
   geom_col(aes(x = params, y = diff, fill = inflation),
            position = position_dodge()) +
@@ -112,11 +130,14 @@ auc_diff <- ggplot(data = auc_data) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-miscr::output_plot(
-  list(plot = auc_diff, filename = file.path(plot_dir, "auc-diff.pdf")),
+miscr::open_graphics_device(
+  filename = file.path(plot_dir, "auc-diff.pdf"),
   width = 12,
   height = 4.8
 )
+print(auc_line_points)
+print(auc_diff)
+dev.off()
 
 # CLUSTER SIZES
 # function to load cluster size data
@@ -151,6 +172,10 @@ cl_size_data <- map(cluster_sizes_files, load_cluster_sizes) |>
       threshold_method == "cor" ~ str_remove(params, "^t"),
     ),
     threshold = as.integer(threshold),
+    threshold = case_when(
+      threshold_method == "cor" ~ threshold / 100,
+      threshold_method == "knn" ~ threshold,
+    ),
     expt = factor(expt, levels = levels(sample_counts$expt))
   ) |> 
   arrange(desc(threshold_method), threshold) |> 
@@ -160,7 +185,7 @@ cl_size_data_by_method <- split(cl_size_data, cl_size_data$threshold_method)
 cl_size_summary <- function(cl_size_df){
   cl_size_df |>
   mutate(threshold = factor(
-    threshold, levels = unique(threshold) |> as.integer() |> sort())
+    threshold, levels = unique(threshold) |> as.numeric() |> sort())
   ) |>
   group_by(expt, params, inflation, threshold) |>
   summarise(
@@ -233,6 +258,7 @@ facetted_ecdf <- function(dat) {
     scale_y_continuous(breaks = c(seq(0,1,0.2)), limits = c(0,1), 
                        labels = scales::label_percent()) +
     scale_colour_manual(values = biovisr::cbf_palette(factor(cl_size_data$inflation)),
+                        labels = divide_by_10,
                         guide = guide_legend(reverse = TRUE)) +
     theme_minimal()
 }
@@ -260,6 +286,7 @@ ecdf_plot <- function(expt, threshold, dat) {
     scale_y_continuous(breaks = c(seq(0,1,0.2)), limits = c(0,1), 
                        labels = scales::label_percent()) +
     scale_colour_manual(values = biovisr::cbf_palette(factor(cl_size_data$inflation)),
+                        labels = divide_by_10,
                         guide = guide_legend(reverse = TRUE)) +
     labs(title = glue::glue("{expt}, threshold = {threshold}")) +
     theme_minimal()
@@ -309,7 +336,8 @@ calc_ecdf_diff <- function(dat_df, method,
     ) |>
     mutate(
       frac = total_nodes / sum(total_nodes),
-      ecdf = cumsum(frac)) %>%
+      ecdf = cumsum(frac)
+    ) %>%
     split(list(.$expt, .$threshold, .$inflation)) |> 
     map(\(x) {
       calc_diff(
@@ -319,20 +347,55 @@ calc_ecdf_diff <- function(dat_df, method,
       )
     }) |> 
     list_rbind() |> 
+    mutate(method = method) |> 
+    ungroup(threshold, inflation) |> 
     arrange(expt, desc(ecdf_diff))
   
   write_tsv(ecdf_diff, file = file.path(paste(method, "cluster_ecdf_diff.tsv", sep = "-")))
+  
+  return(ecdf_diff)
 }
 
-map(c("knn", "cor"),  
-    function(x){ 
+ecdf_diff <- imap(cl_size_data_by_method,
+    function(x, name){ 
       calc_ecdf_diff(
-        cl_size_data_by_method[[x]], 
-        x,
+        x, 
+        name,
         cmd_line_args$options$min_cluster_size,
         cmd_line_args$options$max_cluster_size
       )
-    }) |> invisible()
+    })
+
+top_ecdf_diff_by_expt_method <- 
+  map(ecdf_diff, \(x){ slice_head(x, n = 1) }) |> 
+  list_rbind() |> 
+  arrange(expt, desc(ecdf_diff))
+
+table_title <- glue::glue(
+  "% of nodes in clusters larger than {cmd_line_args$options$min_cluster_size}",
+  "and smaller than {cmd_line_args$options$max_cluster_size}",
+  .sep = " "
+)
+filename <- glue::glue(
+  "top_ecdf_diff_table", 
+  "{cmd_line_args$options$min_cluster_size}",
+  "{cmd_line_args$options$max_cluster_size}.html",
+  .sep = "-")
+top_ecdf_diff_by_expt_method |> 
+  gt() |>
+  tab_header(title = table_title) |> 
+  fmt_percent(columns = c(ecdf_diff), decimals = 1) |>
+  tab_style(
+    style = cell_fill(color =  biovisr::cbf_palette()[5]),
+    locations = cells_body(rows = method == "knn")
+  ) |>
+  tab_style(
+    style = cell_fill(color = biovisr::cbf_palette()[6]),
+    locations = cells_body(rows = method == "cor")
+  ) |> gtsave(filename = filename)
+
+top_ecdf_diff_by_expt_method |> 
+  write_tsv(file = "top_ecdf_diff.tsv")
 
 # AUTHOR
 #
