@@ -292,9 +292,10 @@ process CLUSTER_NETWORK {
     """
 }
 
-process GBA {
+// Run Guilt by association analysis on the clustered network
+// with both GO and ZFA annotation
+process RUN_GUILT_BY_ASSOCIATION {
     label 'process_high_memory'
-    publishDir "results", pattern: "*/all-tpm*.{graphml,tsv,csv,pdf}"
 
     input:
     tuple val(dir), path(tab_file), path(mci_file), path(cluster_file)
@@ -303,10 +304,11 @@ process GBA {
     path(zfa_annotation_file)
 
     output:
-    tuple val(dir), path(cluster_file), path("*/all-tpm*.graphml"),
-        path("*/all-tpm*.nodes.tsv"), path("*/all-tpm*.edges.tsv"),
-        path("*/$dir-all-tpm*.auc.tsv"), path("*/all-tpm*.gene-scores.tsv"),
-        path("*/all-tpm*.GBA-plots.pdf")
+    tuple val(dir), path(cluster_file), path("${dir}-all-tpm*.graphml"),
+        path("${dir}-all-tpm*.nodes.tsv"), path("${dir}-all-tpm*.edges.tsv"),   emit: graph_files
+    path("${dir}-all-tpm*.auc.tsv"),                                            emit: auc_files
+    tuple path("${dir}-all-tpm*.gene-scores.tsv"), 
+        path("${dir}-all-tpm*.GBA-plots.pdf"),                                  emit: gba_out
 
     script:
     matches = (mci_file =~ /all-tpm-(t?)(\d*)-?(k?)(\d*).mcx$/)
@@ -327,30 +329,40 @@ process GBA {
     module load Python/$params.python_version
     convert_mcl.py \
     --min_cluster_size 4 --graph_id \${cluster_base} \
-    --graphml_file ${dir}/\${cluster_base}.graphml \
-    --nodes_file ${dir}/\${cluster_base}.nodes.tsv \
-    --edges_file ${dir}/\${cluster_base}.edges.tsv \
+    --graphml_file \${cluster_base}.graphml \
+    --nodes_file \${cluster_base}.nodes.tsv \
+    --edges_file \${cluster_base}.edges.tsv \
     --edge_offset ${t_num} \
     \${mci_base}.mci $cluster_file $tab_file $annotation_file
 
     module load R/${params.r_version}
     run-GBA-network.R \
-    --auc_file ${dir}/${dir}-\${cluster_base}.go.auc.tsv \
-    --scores_file ${dir}/\${cluster_base}.go.gene-scores.tsv \
-    --plots_file ${dir}/\${cluster_base}.go.GBA-plots.pdf \
+    --auc_file \${cluster_base}.go.auc.tsv \
+    --scores_file \${cluster_base}.go.gene-scores.tsv \
+    --plots_file \${cluster_base}.go.GBA-plots.pdf \
     --min.term.size $params.min_term_size --max.term.size $params.max_term_size \
-    ${dir}/\${cluster_base}.nodes.tsv \
-    ${dir}/\${cluster_base}.edges.tsv \
+    \${cluster_base}.nodes.tsv \
+    \${cluster_base}.edges.tsv \
     $go_annotation_file
 
     run-GBA-network.R \
-    --auc_file ${dir}/${dir}-\${cluster_base}.zfa.auc.tsv \
-    --scores_file ${dir}/\${cluster_base}.zfa.gene-scores.tsv \
-    --plots_file ${dir}/\${cluster_base}.zfa.GBA-plots.pdf \
+    --auc_file \${cluster_base}.zfa.auc.tsv \
+    --scores_file \${cluster_base}.zfa.gene-scores.tsv \
+    --plots_file \${cluster_base}.zfa.GBA-plots.pdf \
     --min.term.size $params.min_term_size --max.term.size $params.max_term_size \
-    ${dir}/\${cluster_base}.nodes.tsv \
-    ${dir}/\${cluster_base}.edges.tsv \
+    \${cluster_base}.nodes.tsv \
+    \${cluster_base}.edges.tsv \
     $zfa_annotation_file
+    """
+
+    stub:
+    """
+    for name in edges.tsv go.GBA-plots.pdf go.gene-scores.tsv graphml \
+    nodes.tsv zfa.GBA-plots.pdf zfa.gene-scores.tsv
+    do
+        touch ${cluster_file}.\$name
+    done
+    touch ${cluster_file}.auc.tsv
     """
 }
 
@@ -539,7 +551,25 @@ workflow {
         // join tab file to CLUSTER_NETWORK clustering output channel by expt name
         tab_ch = CREATE_BASE_NETWORK.out.tab_file
             .join(CLUSTER_NETWORK.out.clustering)
-            .view { x -> "Clustered file with tab file: $x" }
-        
+        // Run Guilt-by-Association on clustered networks
+        RUN_GUILT_BY_ASSOCIATION(
+            tab_ch,                                 // [ expt_name, tab_file, mci_file, cluster_file ]
+            GET_ANNO_GET_GO_ANNO.out.anno_file,     // [ gene_annotation_file ]
+            GET_ANNO_GET_GO_ANNO.out.go_anno_file,  // [ GO_annotation_file ]
+            channel.value(params.zfa_file)          // [ ZFA_annotation_file ]
+        )
+
+        if ( params.debug ) {
+            tab_ch.view { x -> "Tab file with clustered MCI file: $x" }
+            RUN_GUILT_BY_ASSOCIATION.out.graph_files.view { x -> "Graph output files: $x" }
+            RUN_GUILT_BY_ASSOCIATION.out.auc_files.collect().view { x -> "AUC output files: $x" }
+            RUN_GUILT_BY_ASSOCIATION.out.gba_out.view { x -> "GBA output files: $x" }
+            // publish_ch = gba_ch
+            //     .map { [ it[0], it[2], it[3], it[4], it[5], it[6], it[7] ] }
+            //     .join(cluster_ch)
+            //     .groupTuple()
+            //     .view { x -> "Files to choose for publishing: $x" }
+        }
+
     }
 }
