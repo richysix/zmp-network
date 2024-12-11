@@ -253,7 +253,7 @@ process FILTER_STATS {
 }
 
 // Cluster network
-process CLUSTER {
+process CLUSTER_NETWORK {
     label 'process_single'
     
     input:
@@ -526,19 +526,19 @@ workflow {
 
         // Cluster filtered networks
         infl_values_ch = channel.value(params.inflation_params)
-        CLUSTER(
+        CLUSTER_NETWORK(
             filtered_ch,    // [ expt_name, filtered_mci_file ]
             infl_values_ch  // inflation
         )
         if ( params.debug ) {
-            CLUSTER.out.clustering.view { x -> "Clustered MCI file: $x" }
-            CLUSTER.out.cluster_sizes.view { x -> "Cluster size files: $x" }
-            CLUSTER.out.stats.view { x -> "Clustering stats files: $x" }
+            CLUSTER_NETWORK.out.clustering.view { x -> "Clustered MCI file: $x" }
+            CLUSTER_NETWORK.out.cluster_sizes.view { x -> "Cluster size files: $x" }
+            CLUSTER_NETWORK.out.stats.view { x -> "Clustering stats files: $x" }
         }
 
-        // join tab file to CLUSTER clustering output channel by expt name
+        // join tab file to CLUSTER_NETWORK clustering output channel by expt name
         tab_ch = CREATE_BASE_NETWORK.out.tab_file
-            .join(CLUSTER.out.clustering)
+            .join(CLUSTER_NETWORK.out.clustering)
             .view { x -> "Clustered file with tab file: $x" }
         
     }
