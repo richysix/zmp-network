@@ -284,11 +284,10 @@ process CLUSTER_NETWORK {
 
     stub:
     Integer inflationSuffix = inflation * 10
-    def mci_cluster_file = "${dir}/${mci_file}.I${inflationSuffix}"
+    def mci_cluster_file = "${mci_file}.I${inflationSuffix}"
     """
-    mkdir -p ${dir}
-    touch ${mci_cluster_file} ${dir}-${mci_cluster_file}.stats.tsv \
-    ${dir}-${dir}-${mci_cluster_file}.cl-sizes.tsv
+    touch ${mci_cluster_file} ${mci_cluster_file}.stats.tsv \
+    ${mci_cluster_file}.cl-sizes.tsv ${mci_cluster_file}.info.txt
     """
 }
 
