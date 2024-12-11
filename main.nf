@@ -158,7 +158,7 @@ process FILTER_COR {
     each threshold
 
     output:
-    tuple val(dir), path("${dir}-all-tpm-t[0-9]*.mcx"),     emit: filtered_mci
+    tuple val(dir), path("${dir}-all-tpm-t[0-9]*.mcx"),     emit: filtered_mcx
     path("${dir}-all-tpm-t[0-9]*.stats.tsv"),               emit: node_stats
 
     script:
@@ -190,7 +190,7 @@ process FILTER_KNN {
     each knn_threshold
 
     output:
-    tuple val(dir), path("${dir}-all-tpm-t[0-9]*-k[0-9]*.mcx"), emit: filtered_mci
+    tuple val(dir), path("${dir}-all-tpm-t[0-9]*-k[0-9]*.mcx"), emit: filtered_mcx
     path("${dir}-all-tpm-t[0-9]*-k[0-9]*.stats.tsv"),           emit: node_stats
 
     script:
@@ -507,15 +507,15 @@ workflow {
     // If both cor and knn have been run, concat the two channels together
     // Else the new channels are whichever one was run
     if (params.threshold && params.knn) {
-        filtered_ch = FILTER_COR.out.filtered_mci.concat(FILTER_KNN.out.filtered_mci)
+        filtered_ch = FILTER_COR.out.filtered_mcx.concat(FILTER_KNN.out.filtered_mcx)
         filtered_stats_ch = FILTER_COR.out.node_stats
             .concat(FILTER_KNN.out.node_stats)
             .collect()
     } else if (params.threshold) {
-        filtered_ch = FILTER_COR.out.filtered_mci
+        filtered_ch = FILTER_COR.out.filtered_mcx
         filtered_stats_ch = FILTER_COR.out.node_stats.collect()
     } else {
-        filtered_ch = FILTER_KNN.out.filtered_mci
+        filtered_ch = FILTER_KNN.out.filtered_mcx
         filtered_stats_ch = FILTER_KNN.out.node_stats.collect()
     }
 
