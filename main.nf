@@ -121,7 +121,7 @@ process TEST_PARAMETERS {
     label 'process_medium'
 
     input:
-    tuple val(dir), path(mci_file)
+    tuple val(dir), path(mcx_file)
 
     output:
     tuple path("$dir-all-tpm.vary-cor-stats.tsv"),
@@ -132,11 +132,11 @@ process TEST_PARAMETERS {
     module load MCL/$params.mcl_version
 
     # vary correlation
-    mcx query -imx ${mci_file} --vary-correlation \
+    mcx query -imx ${mcx_file} --vary-correlation \
     --output-table > ${dir}-all-tpm.vary-cor-stats.tsv
 
     # test varying k-nearest neighbours
-    mcx query -imx ${mci_file} -vary-knn $params.knn_test_params \
+    mcx query -imx ${mcx_file} -vary-knn $params.knn_test_params \
     --output-table > ${dir}-all-tpm.vary-knn-stats.tsv
     """
 
@@ -154,7 +154,7 @@ process FILTER_COR {
         'biocontainers/mcl:14.137--0' }"
     
     input:
-    tuple val(dir), path(mci_file)
+    tuple val(dir), path(mcx_file)
     each threshold
 
     output:
@@ -164,7 +164,7 @@ process FILTER_COR {
     script:
     Integer suffix = threshold * 100
     """
-    mcx alter -imx ${mci_file} \
+    mcx alter -imx ${mcx_file} \
     -tf "gt(${threshold}), add(-${threshold})" \
     --write-binary -o ${dir}-all-tpm-t${suffix}.mcx
     mcx alter -imx ${dir}-all-tpm-t${suffix}.mcx \
@@ -174,10 +174,10 @@ process FILTER_COR {
 
     stub:
     Integer suffix = threshold * 100
-    def mci = "${dir}-all-tpm-t${suffix}.mcx"
+    def mcx = "${dir}-all-tpm-t${suffix}.mcx"
     def stats = "${dir}-all-tpm-t${suffix}.stats.tsv"
     """
-    touch ${mci} ${stats}
+    touch ${mcx} ${stats}
     """
 }
 
@@ -186,7 +186,7 @@ process FILTER_KNN {
     label 'process_low'
 
     input:
-    tuple val(dir), path(mci_file)
+    tuple val(dir), path(mcx_file)
     each knn_threshold
 
     output:
@@ -200,7 +200,7 @@ process FILTER_KNN {
     module load MCL/$params.mcl_version
 
     knnBase="${dir}-all-tpm-t${thresholdSuffix}-k${knn_threshold}"
-    mcx alter -imx ${mci_file} \
+    mcx alter -imx ${mcx_file} \
     -tf "abs(), gt(${threshold}), add(-${threshold}), #knn($knn_threshold)" \
     --write-binary -o \${knnBase}.mcx
     # stats
@@ -216,6 +216,7 @@ process FILTER_KNN {
     """
 }
 
+// Produce some plots after filtering
 process FILTER_STATS {
     label 'process_single'
     publishDir "results", pattern: "plots/*.pdf"
@@ -257,25 +258,25 @@ process CLUSTER_NETWORK {
     label 'process_single'
     
     input:
-    tuple val(dir), path(mci_file)
+    tuple val(dir), path(mcx_file)
     each inflation
 
     output:
-    tuple val(dir), path(mci_file), path("${mci_file}.I[0-9][0-9]"),     emit: clustering
-    path("${mci_file}.I[0-9][0-9].cl-sizes.tsv"),                        emit: cluster_sizes
-    tuple path("${mci_file}.I[0-9][0-9].stats.tsv"),
-        path("${mci_file}.I[0-9][0-9].info.txt"),                        emit: stats
+    tuple val(dir), path(mcx_file), path("${mcx_file}.I[0-9][0-9]"),     emit: clustering
+    path("${mcx_file}.I[0-9][0-9].cl-sizes.tsv"),                        emit: cluster_sizes
+    tuple path("${mcx_file}.I[0-9][0-9].stats.tsv"),
+        path("${mcx_file}.I[0-9][0-9].info.txt"),                        emit: stats
 
     script:
     Integer inflationSuffix = inflation * 10
-    def file_base = "${mci_file}.I${inflationSuffix}"
+    def file_base = "${mcx_file}.I${inflationSuffix}"
     """
     module load MCL/${params.mcl_version}
-    mcl ${mci_file} -I ${inflation} -o ${file_base}
+    mcl ${mcx_file} -I ${inflation} -o ${file_base}
 
-    clm info ${mci_file} ${file_base} >> ${file_base}.info.txt
+    clm info ${mcx_file} ${file_base} >> ${file_base}.info.txt
 
-    clm info --node-all-measures --node-self-measures $mci_file \
+    clm info --node-all-measures --node-self-measures ${mcx_file} \
     ${file_base} > ${file_base}.stats.tsv
 
     module load Python/${params.python_version}
@@ -284,10 +285,10 @@ process CLUSTER_NETWORK {
 
     stub:
     Integer inflationSuffix = inflation * 10
-    def mci_cluster_file = "${mci_file}.I${inflationSuffix}"
+    def mcx_cluster_file = "${mcx_file}.I${inflationSuffix}"
     """
-    touch ${mci_cluster_file} ${mci_cluster_file}.stats.tsv \
-    ${mci_cluster_file}.cl-sizes.tsv ${mci_cluster_file}.info.txt
+    touch ${mcx_cluster_file} ${mcx_cluster_file}.stats.tsv \
+    ${mcx_cluster_file}.cl-sizes.tsv ${mcx_cluster_file}.info.txt
     """
 }
 
@@ -297,61 +298,60 @@ process RUN_GUILT_BY_ASSOCIATION {
     label 'process_high_memory'
 
     input:
-    tuple val(dir), path(tab_file), path(mci_file), path(cluster_file)
+    tuple val(dir), path(tab_file), path(mcx_file), path(cluster_file)
     path(annotation_file)
     path(go_annotation_file)
     path(zfa_annotation_file)
 
     output:
-    tuple val(dir), path(cluster_file), path("${dir}-all-tpm*.graphml"),
-        path("${dir}-all-tpm*.nodes.tsv"), path("${dir}-all-tpm*.edges.tsv"),   emit: graph_files
+    tuple path(cluster_file),
+        path("${dir}-all-tpm*.graphml"),
+        path("${dir}-all-tpm*.nodes.tsv"),
+        path("${dir}-all-tpm*.edges.tsv"),   emit: graph_files
     path("${dir}-all-tpm*.auc.tsv"),                                            emit: auc_files
     tuple path("${dir}-all-tpm*.gene-scores.tsv"), 
         path("${dir}-all-tpm*.GBA-plots.pdf"),                                  emit: gba_out
 
     script:
-    matches = (mci_file =~ /all-tpm-(t?)(\d*)-?(k?)(\d*).mcx$/)
+    matches = (mcx_file =~ /all-tpm-(t?)(\d*)-?(k?)(\d*).mcx$/)
     t_num = get_threshold(matches)
     if (params.debug){
         println("GBA: Threshold value = " + t_num)
     }
     """
-    mkdir -p ${dir}
-    cluster_base=\$( basename $cluster_file )
-
     # convert from binary
     module load MCL/${params.mcl_version}
-    mci_base=\$( basename $mci_file .mcx)
-    mcx convert $mci_file \${mci_base}.mci
+    mcx_base=\$( basename ${mcx_file} .mcx)
+    mcx convert ${mcx_file} \${mcx_base}.mci
 
     # run convert_mcl script
-    module load Python/$params.python_version
+    module load Python/${params.python_version}
     convert_mcl.py \
-    --min_cluster_size 4 --graph_id \${cluster_base} \
-    --graphml_file \${cluster_base}.graphml \
-    --nodes_file \${cluster_base}.nodes.tsv \
-    --edges_file \${cluster_base}.edges.tsv \
+    --min_cluster_size 4 --graph_id ${cluster_file} \
+    --graphml_file ${cluster_file}.graphml \
+    --nodes_file ${cluster_file}.nodes.tsv \
+    --edges_file ${cluster_file}.edges.tsv \
     --edge_offset ${t_num} \
-    \${mci_base}.mci $cluster_file $tab_file $annotation_file
+    \${mcx_base}.mci ${cluster_file} ${tab_file} ${annotation_file}
 
     module load R/${params.r_version}
     run-GBA-network.R \
-    --auc_file \${cluster_base}.go.auc.tsv \
-    --scores_file \${cluster_base}.go.gene-scores.tsv \
-    --plots_file \${cluster_base}.go.GBA-plots.pdf \
-    --min.term.size $params.min_term_size --max.term.size $params.max_term_size \
-    \${cluster_base}.nodes.tsv \
-    \${cluster_base}.edges.tsv \
-    $go_annotation_file
+    --auc_file ${cluster_file}.go.auc.tsv \
+    --scores_file ${cluster_file}.go.gene-scores.tsv \
+    --plots_file ${cluster_file}.go.GBA-plots.pdf \
+    --min.term.size ${params.min_term_size} --max.term.size ${params.max_term_size} \
+    ${cluster_file}.nodes.tsv \
+    ${cluster_file}.edges.tsv \
+    ${go_annotation_file}
 
     run-GBA-network.R \
-    --auc_file \${cluster_base}.zfa.auc.tsv \
-    --scores_file \${cluster_base}.zfa.gene-scores.tsv \
-    --plots_file \${cluster_base}.zfa.GBA-plots.pdf \
-    --min.term.size $params.min_term_size --max.term.size $params.max_term_size \
-    \${cluster_base}.nodes.tsv \
-    \${cluster_base}.edges.tsv \
-    $zfa_annotation_file
+    --auc_file ${cluster_file}.zfa.auc.tsv \
+    --scores_file ${cluster_file}.zfa.gene-scores.tsv \
+    --plots_file ${cluster_file}.zfa.GBA-plots.pdf \
+    --min.term.size ${params.min_term_size} --max.term.size ${params.max_term_size} \
+    ${cluster_file}.nodes.tsv \
+    ${cluster_file}.edges.tsv \
+    ${zfa_annotation_file}
     """
 
     stub:
@@ -559,7 +559,7 @@ workflow {
         // Cluster filtered networks
         infl_values_ch = channel.value(params.inflation_params)
         CLUSTER_NETWORK(
-            filtered_ch,    // [ expt_name, filtered_mci_file ]
+            filtered_ch,    // [ expt_name, filtered_mcx_file ]
             infl_values_ch  // inflation
         )
         if ( params.debug ) {
@@ -573,7 +573,7 @@ workflow {
             .join(CLUSTER_NETWORK.out.clustering)
         // Run Guilt-by-Association on clustered networks
         RUN_GUILT_BY_ASSOCIATION(
-            tab_ch,                                 // [ expt_name, tab_file, mci_file, cluster_file ]
+            tab_ch,                                 // [ expt_name, tab_file, mcx_file, cluster_file ]
             GET_ANNO_GET_GO_ANNO.out.anno_file,     // [ gene_annotation_file ]
             GET_ANNO_GET_GO_ANNO.out.go_anno_file,  // [ GO_annotation_file ]
             channel.value(params.zfa_file)          // [ ZFA_annotation_file ]
