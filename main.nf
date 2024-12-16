@@ -42,7 +42,7 @@ process SUBSET_COUNTS {
     path("*/counts-by-gene.tsv"),    emit: count_files  // tuple of count file names
 
     script:
-    debug = params.debug ? "-d" : ""
+    debug = params.debug > 0 ? "-d" : ""
     """
     subset-by-expt.sh ${debug} ${sample_file} ${all_counts_file}
     """
@@ -307,15 +307,15 @@ process RUN_GUILT_BY_ASSOCIATION {
     tuple path(cluster_file),
         path("${dir}-all-tpm*.graphml"),
         path("${dir}-all-tpm*.nodes.tsv"),
-        path("${dir}-all-tpm*.edges.tsv"),   emit: graph_files
-    path("${dir}-all-tpm*.auc.tsv"),                                            emit: auc_files
+        path("${dir}-all-tpm*.edges.tsv"),              emit: graph_files
+    path("${dir}-all-tpm*.auc.tsv"),                    emit: auc_files
     tuple path("${dir}-all-tpm*.gene-scores.tsv"), 
-        path("${dir}-all-tpm*.GBA-plots.pdf"),                                  emit: gba_out
+        path("${dir}-all-tpm*.GBA-plots.pdf"),          emit: gba_out
 
     script:
     matches = (mcx_file =~ /all-tpm-(t?)(\d*)-?(k?)(\d*).mcx$/)
     t_num = get_threshold(matches)
-    if (params.debug){
+    if (params.debug > 1 ){
         println("GBA: Threshold value = " + t_num)
     }
     """
@@ -407,15 +407,15 @@ process RUN_GO_ENRICHMENT {
     label 'process_single'
 
     input:
-    tuple val(dir), path(cluster_file), path(graphml_file),
+    tuple path(cluster_file), path(graphml_file),
         path(nodes_file), path(edges_file)
     path(go_annotation_file)
 
     output:
-    tuple val(dir), path(cluster_file), path("${cluster_file}.GO/*"), emit: go_output
+    tuple path(cluster_file), path("${cluster_file}.GO/*"), emit: go_output
 
     script:
-    if (params.debug){
+    if (params.debug > 1 ){
         println("RUN_GO_ENRICHMENT: Name of cluster file is ${cluster_file}")
     }
     """
@@ -481,7 +481,7 @@ workflow {
     // join sample files to count files by expt name
     files_by_expt = sample_files.join(count_files)
 
-    if ( params.debug ) {
+    if ( params.debug > 1 ) {
         SUBSET_COUNTS.out.expts_file.view { x -> "Expts file: $x"}
         sample_files.view { x -> "Expt name + sample file: $x"}
         count_files.view { x -> "Expt name + count file: $x"}
@@ -530,7 +530,7 @@ workflow {
         stats_ch,
         filtered_stats_ch
     )
-    if ( params.debug ) {
+    if ( params.debug > 1 ) {
         // Filtered network files for clustering
         filtered_ch.view { x -> "Filtered network files: $x" }
         // Files for FILTER_STATS
@@ -551,7 +551,7 @@ workflow {
             go_version: params.ensembl_versionGO,
             go_bash_url: params.get_go_anno_bash_url ]
         )
-        if ( params.debug ) {
+        if ( params.debug > 1 ) {
             GET_ANNO_GET_GO_ANNO.out.anno_file.view { x -> "Annotation file: $x" }
             GET_ANNO_GET_GO_ANNO.out.go_anno_file.view { x -> "GO annotation file: $x" }
         }
@@ -562,7 +562,7 @@ workflow {
             filtered_ch,    // [ expt_name, filtered_mcx_file ]
             infl_values_ch  // inflation
         )
-        if ( params.debug ) {
+        if ( params.debug > 1 ) {
             CLUSTER_NETWORK.out.clustering.view { x -> "Clustered MCI file: $x" }
             CLUSTER_NETWORK.out.cluster_sizes.view { x -> "Cluster size files: $x" }
             CLUSTER_NETWORK.out.stats.view { x -> "Clustering stats files: $x" }

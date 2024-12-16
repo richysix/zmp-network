@@ -16,7 +16,7 @@ workflow GET_ANNO_GET_GO_ANNO {
     // Check if annotation file already exists
     if (ch_anno.anno_file.exists()) {
         ch_anno_file = Channel.of(ch_anno.anno_file)
-        if ( params.debug ) {
+        if ( params.debug > 1) {
             println("Annotation file exists")
             ch_anno_file.view { x -> "Annotation file: $x" }
         }
@@ -27,7 +27,7 @@ workflow GET_ANNO_GET_GO_ANNO {
             ch_anno.anno_script_url,
             ch_anno.anno_bash_url
         )
-        if ( params.debug ) {
+        if ( params.debug > 1) {
             println("Annotation file does NOT exist. Downloading...")
             ch_anno_file.view { x -> "Annotation file: $x" }
         }
@@ -35,7 +35,7 @@ workflow GET_ANNO_GET_GO_ANNO {
 
     if (ch_go_anno.go_anno_file.exists()) {
         ch_go_anno_file = Channel.of(ch_go_anno.go_anno_file)
-        if ( params.debug ) {
+        if ( params.debug > 1) {
             println("GO annotation file exists")
             ch_go_anno_file.view { x -> "GO annotation file: $x" }
         }
@@ -45,7 +45,7 @@ workflow GET_ANNO_GET_GO_ANNO {
             ch_go_anno.go_version,
             ch_go_anno.go_bash_url
         )
-        if ( params.debug ) {
+        if ( params.debug > 1) {
             println("GO annotation file does NOT exist. Downloading...")
             ch_go_anno_file.view { x -> "GO annotation file: $x" }
         }
