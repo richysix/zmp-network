@@ -466,6 +466,45 @@ process RUN_GO_ENRICHMENT {
     """
 }
 
+process PUBLISH_NETWORKS {
+    label 'process_single'
+    publishDir "results", pattern: "*/*"
+
+    input:
+    path("*") // ecdf tsv files from RUN_POST_GBA_STATS
+    path("*") // tpm, tab and base network files
+    path("*") // network stats files
+    path("*") // graphs and GO output
+    path("*") // AUC files
+    path("*") // other GBA output files
+
+    output:
+    path("*/*")
+
+    script:
+    """
+
+    """
+
+    stub:
+    """
+    for dir in test-1 test-2
+    do
+        mkdir -p \$dir
+        base="all-tpm-t20-k3.mcx"
+        touch \$dir/\$base
+        touch \$dir/\$base.I14
+        for suffix in cl-size-summary.tsv stats.tsv \
+        edges.tsv nodes.tsv graphml \
+        go.GBA-plots.pdf zfa.GBA-plots.pdf \
+        go.gene-scores.tsv zfa.gene-scores.tsv
+        do
+            touch \$dir/\$base.I14.\$suffix
+        done
+    done
+    """
+}
+
 workflow {
     // Subset counts file to expts
     SUBSET_COUNTS(params.samples, params.all_counts)
@@ -569,8 +608,13 @@ workflow {
         }
 
         // join tab file to CLUSTER_NETWORK clustering output channel by expt name
+        // Have to use the combine operator because the key (expt_name)
+        // is not unique, because the networks are clustered with different inflation params
+        CREATE_BASE_NETWORK.out.tab_file.view()
+        CLUSTER_NETWORK.out.clustering.view()
         tab_ch = CREATE_BASE_NETWORK.out.tab_file
-            .join(CLUSTER_NETWORK.out.clustering)
+            .combine(CLUSTER_NETWORK.out.clustering, by: 0)
+
         // Run Guilt-by-Association on clustered networks
         RUN_GUILT_BY_ASSOCIATION(
             tab_ch,                                 // [ expt_name, tab_file, mcx_file, cluster_file ]
@@ -579,10 +623,11 @@ workflow {
             channel.value(params.zfa_file)          // [ ZFA_annotation_file ]
         )
 
+        auc_files_ch = RUN_GUILT_BY_ASSOCIATION.out.auc_files.collect()
         RUN_POST_GBA_STATS(
             SUBSET_COUNTS.out.expts_file,
             params.samples,
-            RUN_GUILT_BY_ASSOCIATION.out.auc_files.collect(),
+            auc_files_ch,
             CLUSTER_NETWORK.out.cluster_sizes.collect()
         )
 
@@ -593,22 +638,56 @@ workflow {
             GET_ANNO_GET_GO_ANNO.out.go_anno_file
         )
 
-        if ( params.debug ) {
-            tab_ch.view { x -> "Tab file with clustered MCI file: $x" }
+        base_network_ch = CREATE_BASE_NETWORK.out.tpms_file
+            .join(CREATE_BASE_NETWORK.out.tab_file)
+            .join(CREATE_BASE_NETWORK.out.base_network)
+            .map { expt, tpms, tab, base -> [tpms, tab, base]} // remove expt. not needed
+            .collect()
+
+        filtered_network_ch = filtered_ch.map { expt, mcx -> mcx }
+            .collect()
+        // stats files from clustering
+        stats_files_ch = CLUSTER_NETWORK.out.cluster_sizes
+            .mix(CLUSTER_NETWORK.out.stats)
+            .collect()
+
+        // join graph files to GO enrichment out file by clustered network
+        // Need to remove the path from the network files for the join to work
+        graph_files_ch = RUN_GUILT_BY_ASSOCIATION.out.graph_files
+            .map { network, graphml, node, edges -> [ network.name, network, graphml, node, edges ] }
+        go_out_files_ch = RUN_GO_ENRICHMENT.out.go_output
+            .map { network, go_out_files -> [ network.name, go_out_files ] }
+        // join together with network name, the remove it so that everything is a path
+        graph_files_with_go_ch = graph_files_ch.join(go_out_files_ch)
+            .map { name, mcx, graphml, node, edges, go_out_files -> [ mcx, graphml, node, edges, go_out_files ] }
+            .flatten()
+            .collect()
+            .view()
+
+        PUBLISH_NETWORKS(
+            RUN_POST_GBA_STATS.out.tsv,
+            base_network_ch,
+            stats_files_ch,
+            graph_files_with_go_ch,                         // [ mcx, graphml, node, edges, GO_files]
+            auc_files_ch,
+            RUN_GUILT_BY_ASSOCIATION.out.gba_out.flatten().collect()
+        )
+
+        if ( params.debug > 1 ) {
+            tab_ch.view { x -> "Tab file with clustered MCX file: $x" }
             RUN_GUILT_BY_ASSOCIATION.out.graph_files.view { x -> "Graph output files: $x" }
             RUN_GUILT_BY_ASSOCIATION.out.auc_files.collect().view { x -> "AUC output files: $x" }
-            RUN_GUILT_BY_ASSOCIATION.out.gba_out.view { x -> "GBA output files: $x" }
+            RUN_GUILT_BY_ASSOCIATION.out.gba_out.flatten().collect().view { x -> "GBA output files: $x" }
 
             RUN_GO_ENRICHMENT.out.go_output.view { x -> "GO_ENRICHMENT output files: $x" }
 
             RUN_POST_GBA_STATS.out.plots.view { x -> "RUN_POST_GBA_STATS plots: $x" }
             RUN_POST_GBA_STATS.out.tsv.view { x -> "RUN_POST_GBA_STATS tsv files: $x" }
             RUN_POST_GBA_STATS.out.html.view { x -> "RUN_POST_GBA_STATS html files: $x" }
-            // publish_ch = gba_ch
-            //     .map { [ it[0], it[2], it[3], it[4], it[5], it[6], it[7] ] }
-            //     .join(cluster_ch)
-            //     .groupTuple()
-            //     .view { x -> "Files to choose for publishing: $x" }
+
+            base_network_ch.view { x -> "tpms, tab, base: $x" }
+            filtered_network_ch.view { x -> "filtered mcx: $x" }
+            graph_files_with_go_ch.view { x -> "Graph files with GO enrichment: $x" }
         }
 
     }
