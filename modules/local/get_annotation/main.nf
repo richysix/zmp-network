@@ -1,6 +1,6 @@
 def convert_species_lc_nospace (species) {
-    species_nospace = species.replaceAll(" ", "_")
-    species_lc = species_nospace.toLowerCase()
+    def species_nospace = species.replaceAll(" ", "_")
+    def species_lc = species_nospace.toLowerCase()
     return species_lc
 }
 
