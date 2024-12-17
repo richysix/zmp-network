@@ -24,9 +24,9 @@ def main(args):
             if items[col_idx_for["method"]] != args.method:
                 continue
         info = { name: items[col_idx_for[name]] for name in ["expt", "threshold", "inflation"] }
-        filename = f"{info['expt']}-t20-k{info['threshold']}.mcx.I{info['inflation']}"
+        filename = f"{info['expt']}-all-tpm-t20-k{info['threshold']}.mcx.I{info['inflation']}"
         # create new dir
-        Path(info['expt']).mkdir()
+        Path(info['expt']).mkdir(exist_ok = True)
         # get filenames matching pattern
         dir = Path('.')
         for file in dir.glob(f"{filename}*"):
