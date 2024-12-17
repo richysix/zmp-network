@@ -1,36 +1,38 @@
 #!/usr/bin/env Rscript
 
-library('optparse')
+library("optparse")
 
 option_list <- list(
   make_option(
     "--samples_file", type = "character",
-    default = "expt-sample-condition-test.tsv", 
-    help = "Name of the overall samples file [default %default]" 
+    default = "expt-sample-condition-test.tsv",
+    help = "Name of the overall samples file [default %default]"
   ),
   make_option(
-    "--min_cluster_size", type = "integer", default = 100, 
-    help = "Lower bound of the range to calculate the max ecdf over [default %default]" 
+    "--min_cluster_size", type = "integer", default = 100,
+    help = paste0("Lower bound of the range to calculate the max ecdf over ",
+                  "[default %default]")
   ),
   make_option(
-    "--max_cluster_size", type = "integer", default = 1000, 
-    help = "Upper bound of the range to calculate the max ecdf over [default %default]" 
+    "--max_cluster_size", type = "integer", default = 1000,
+    help = paste0("Upper bound of the range to calculate the max ecdf over ",
+                  "[default %default]"
   ),
   make_option(c("-d", "--debug"), action = "store_true", default = FALSE,
               help = "Print extra output [default %default]")
 )
 
-desc <- paste('Script to create overview plots for GBA analysis', sep = "\n")
+desc <- paste("Script to create overview plots for GBA analysis", sep = "\n")
 
 cmd_line_args <- parse_args(
   OptionParser(
     option_list = option_list,
     description = desc,
-    usage = "Usage: %prog [options]" ),
+    usage = "Usage: %prog [options]"),
   positional_arguments = 0
 )
 
-packages <- c('tidyverse', 'gt')
+packages <- c("tidyverse", "gt")
 for (package in packages) {
     suppressPackageStartupMessages( suppressWarnings( library(package, character.only = TRUE) ) )
 }
@@ -41,7 +43,7 @@ if (!dir.exists(plot_dir)) {
 }
 
 # helper function for converting inflation numbers for axes
-divide_by_10 <- function(x){ (as.integer(x)/10) |> as.character() }
+divide_by_10 <- function(x) { (as.integer(x)/10) |> as.character() }
 
 # find all expt names
 expts <- read_tsv("expts.txt", show_col_types = FALSE, col_names = c("expt"))
@@ -52,9 +54,9 @@ bin_labels <- paste(
   bin_breaks[seq_len(length(bin_breaks) - 1) + 1],
   sep = "-"
 )
-sample_counts <- read_tsv(cmd_line_args$options$samples_file, show_col_types = FALSE) |> 
-  filter(expt %in% expts$expt) |> 
-  count(expt) |> 
+sample_counts <- read_tsv(cmd_line_args$options$samples_file, show_col_types = FALSE) |>
+  filter(expt %in% expts$expt) |>
+  count(expt) |>
   mutate(
     expt = fct_reorder(expt, n),
     sample_n_bin = cut(n, breaks = bin_breaks, labels = bin_labels)
@@ -66,10 +68,10 @@ colour_palette <- biovisr::cbf_palette(sample_counts$expt,
 # function to summarise AUC values
 summarise_auc <- function(filename) {
   expt <- str_remove(filename, "-all-tpm.*$")
-  file_info <- basename(filename) |> 
-    str_remove("^.*all-tpm-") |> 
+  file_info <- basename(filename) |>
+    str_remove("^.*all-tpm-") |>
     str_split_1("\\.")
-  read_tsv(filename, show_col_types = FALSE) |> 
+  read_tsv(filename, show_col_types = FALSE) |>
     summarise(
       mean_auc = mean(auc),
       mean_null_auc = mean(degree_null_auc)
