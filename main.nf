@@ -1,18 +1,5 @@
 #!/usr/bin/env nextflow
 
-log.info """\
-  NETWORK CONSTRUCTION PIPELINE
-  -----------------------------
-
-  Clustering: ${params.clustering}
-  Debug: ${params.debug}
-  Expt to sample file: ${params.samples}
-  All counts file: ${params.all_counts}
-  Threshold params: ${params.threshold}
-  KNN params: ${params.knn}
-  Inflation Params: ${params.inflation_params}
-"""
-
 include { GET_ANNO_GET_GO_ANNO } from './subworkflows/local/get_gene_and_go_annotation'
 
 def get_threshold(m) {
@@ -23,6 +10,24 @@ def get_threshold(m) {
         t = 0
     }
     return t
+}
+
+process LOG_INFO {
+    label 'process_single'
+
+    exec:
+    log.info """\
+    NETWORK CONSTRUCTION PIPELINE
+    -----------------------------
+
+    Clustering: ${params.clustering}
+    Debug: ${params.debug}
+    Expt to sample file: ${params.samples}
+    All counts file: ${params.all_counts}
+    Threshold params: ${params.threshold}
+    KNN params: ${params.knn}
+    Inflation Params: ${params.inflation_params}
+    """
 }
 
 // process to subset the file containing all the samples
@@ -506,6 +511,9 @@ process PUBLISH_NETWORKS {
 }
 
 workflow {
+    if ( params.debug > 0 ) {
+        LOG_INFO()
+    }
     // Subset counts file to expts
     SUBSET_COUNTS(params.samples, params.all_counts)
     // extract expt name from path to use as join key
