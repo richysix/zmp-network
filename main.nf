@@ -28,6 +28,11 @@ process LOG_INFO {
     KNN params: ${params.knn}
     Inflation Params: ${params.inflation_params}
     """
+
+    stub:
+    """
+    echo "Log info"
+    """
 }
 
 // process to subset the file containing all the samples
@@ -473,22 +478,23 @@ process RUN_GO_ENRICHMENT {
 
 process PUBLISH_NETWORKS {
     label 'process_single'
-    publishDir "results", pattern: "*/*"
+    publishDir "results", pattern: "${expt}/*"
 
     input:
-    path("*") // ecdf tsv files from RUN_POST_GBA_STATS
-    path("*") // tpm, tab and base network files
-    path("*") // network stats files
-    path("*") // graphs and GO output
-    path("*") // AUC files
-    path("*") // other GBA output files
+    tuple val(expt), val(method) // name of experiment
+    path("*") // RUN_POST_GBA_STATS.out.tsv: ecdf tsv files
+    path("*") // base_network_ch: tpm, tab and base network files
+    path("*") // stats_files_ch: network stats files
+    path("*") // graph_files_with_go_ch: graphs and GO output
+    path("*") // auc_files_ch: AUC files
+    path("*") // RUN_GUILT_BY_ASSOCIATION.out.gba_out.flatten().collect(): other GBA output files
 
     output:
-    path("*/*")
+    path("${expt}/*"), emit: pub_files
 
     script:
     """
-
+    stage_output_files.py --expt ${expt} --method ${method} top_ecdf_diff.tsv
     """
 
     stub:
@@ -649,10 +655,10 @@ workflow {
         base_network_ch = CREATE_BASE_NETWORK.out.tpms_file
             .join(CREATE_BASE_NETWORK.out.tab_file)
             .join(CREATE_BASE_NETWORK.out.base_network)
-            .map { expt, tpms, tab, base -> [tpms, tab, base]} // remove expt. not needed
+            .map { _expt, tpms, tab, base -> [tpms, tab, base]} // remove expt. not needed
             .collect()
 
-        filtered_network_ch = filtered_ch.map { expt, mcx -> mcx }
+        filtered_network_ch = filtered_ch.map { _expt, mcx -> mcx }
             .collect()
         // stats files from clustering
         stats_files_ch = CLUSTER_NETWORK.out.cluster_sizes
@@ -667,12 +673,14 @@ workflow {
             .map { network, go_out_files -> [ network.name, go_out_files ] }
         // join together with network name, the remove it so that everything is a path
         graph_files_with_go_ch = graph_files_ch.join(go_out_files_ch)
-            .map { name, mcx, graphml, node, edges, go_out_files -> [ mcx, graphml, node, edges, go_out_files ] }
+            .map { _name, mcx, graphml, node, edges, go_out_files -> [ mcx, graphml, node, edges, go_out_files ] }
             .flatten()
             .collect()
             .view()
 
+        expts_ch = sample_files.map { expt, _samples_file -> [ expt, "knn" ] }
         PUBLISH_NETWORKS(
+            expts_ch,
             RUN_POST_GBA_STATS.out.tsv,
             base_network_ch,
             stats_files_ch,
