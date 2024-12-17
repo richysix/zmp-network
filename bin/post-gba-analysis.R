@@ -16,7 +16,7 @@ option_list <- list(
   make_option(
     "--max_cluster_size", type = "integer", default = 1000,
     help = paste0("Upper bound of the range to calculate the max ecdf over ",
-                  "[default %default]"
+                  "[default %default]")
   ),
   make_option(c("-d", "--debug"), action = "store_true", default = FALSE,
               help = "Print extra output [default %default]")
