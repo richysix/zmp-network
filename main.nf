@@ -440,7 +440,7 @@ process RUN_GO_ENRICHMENT {
     # run go enrichment script
     if [[ \$( find ./ -type f -name "${cluster_file}.cluster-*" | wc -l ) -le 1 ]] ; then
         echo "No clusters to test!"
-        echo "No clusters to test!" > ${cluster_file}.GO/done.txt
+        echo "No clusters to test!" > ${cluster_file}.GO/${cluster_file}-done.txt
     else
         module load R/${params.r_version}
         module load topgo-wrapper/${params.ensembl_versionGO}
@@ -494,6 +494,7 @@ process PUBLISH_NETWORKS {
 
     script:
     """
+    module load Python/${params.python_version}
     stage_output_files.py --expt ${expt} --method ${method} top_ecdf_diff.tsv
     """
 
