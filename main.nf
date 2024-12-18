@@ -14,6 +14,7 @@ def get_threshold(m) {
 
 process LOG_INFO {
     label 'process_single'
+    executor 'local'
 
     exec:
     log.info """\
