@@ -6,7 +6,7 @@ def convert_species_lc_nospace (species) {
 
 process GET_ANNOTATION {
     // tag "$meta.id"
-    label 'local'
+    label 'process_single'
     publishDir "reference", pattern: "$outFile"
 
     input:
@@ -45,7 +45,7 @@ workflow GET_ANNOTATION_WF {
 
 process GET_GO_ANNOTATION {
     // tag "$meta.id"
-    label 'local'
+    label 'process_single'
     publishDir "reference", pattern: "*_e*_go.txt"
 
     input:
