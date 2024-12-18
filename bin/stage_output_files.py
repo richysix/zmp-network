@@ -24,11 +24,16 @@ def main(args):
             if items[col_idx_for["method"]] != args.method:
                 continue
         info = { name: items[col_idx_for[name]] for name in ["expt", "threshold", "inflation"] }
-        filename = f"{info['expt']}-all-tpm-t20-k{info['threshold']}.mcx.I{info['inflation']}"
         # create new dir
         Path(info['expt']).mkdir(exist_ok = True)
-        # get filenames matching pattern
         dir = Path('.')
+        # filtered network
+        file = Path(f"{info['expt']}-all-tpm-t20-k{info['threshold']}.mcx")
+        new_file = dir / info['expt'] / file.name
+        file.rename(new_file)
+
+        filename = f"{info['expt']}-all-tpm-t20-k{info['threshold']}.mcx.I{info['inflation']}"
+        # get filenames matching pattern
         for file in dir.glob(f"{filename}*"):
             # try moving file it to new dir
             new_file = dir / info['expt'] / file.name
