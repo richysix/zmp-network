@@ -75,6 +75,10 @@ process SUBSET_COUNTS {
 // in TEST_PARAMETERS (smaller to load into memory)
 process CREATE_BASE_NETWORK {
     label 'process_medium'
+    publishDir "results/${expt}", pattern: "${expt}-all-tpm.tsv"
+    publishDir "results/${expt}", pattern: "${expt}-all-tpm.tab"
+    publishDir "results/${expt}", pattern: "${expt}-all-tpm-orig.mcx"
+
 
     input: 
     tuple val(expt), path(sample_file), path(count_file)
@@ -397,7 +401,9 @@ process RUN_POST_GBA_STATS {
     script:
     """
     module load R/${params.r_version}
-    post-gba-analysis.R --samples_file ${sample_file}
+    post-gba-analysis.R --samples_file ${sample_file} \
+    --min_cluster_size 100 \
+    --max_cluster_size 1000
     """
 
     stub:
@@ -423,7 +429,7 @@ process RUN_GO_ENRICHMENT {
     path(go_annotation_file)
 
     output:
-    tuple path(cluster_file), path("${cluster_file}.GO/*"), emit: go_output
+    tuple path(cluster_file), path("${cluster_file}.GO"), emit: go_output
 
     script:
     if (params.debug > 1 ){
@@ -484,7 +490,8 @@ process PUBLISH_NETWORKS {
     input:
     tuple val(expt), val(method) // name of experiment
     path("*") // RUN_POST_GBA_STATS.out.tsv: ecdf tsv files
-    path("*") // base_network_ch: tpm, tab and base network files
+    // path("*") // base_network_ch: tpm, tab and base network files
+    path("*") // filtered_network_ch: t*-k*-mcx
     path("*") // stats_files_ch: network stats files
     path("*") // graph_files_with_go_ch: graphs and GO output
     path("*") // auc_files_ch: AUC files
@@ -505,15 +512,16 @@ process PUBLISH_NETWORKS {
     do
         mkdir -p \$dir
         base="all-tpm-t20-k3.mcx"
-        touch \$dir/\$base
-        touch \$dir/\$base.I14
-        for suffix in cl-size-summary.tsv stats.tsv \
+        mv \$dir-\$base \$dir/
+        mv \$dir-\$base.I14 \$dir/
+        for suffix in cl-sizes.tsv stats.tsv \
         edges.tsv nodes.tsv graphml \
         go.GBA-plots.pdf zfa.GBA-plots.pdf \
         go.gene-scores.tsv zfa.gene-scores.tsv
         do
-            touch \$dir/\$base.I14.\$suffix
+            mv \$dir-\$base.I14.\$suffix \$dir/
         done
+        mv \$dir-\$base.I14.GO \$dir/
     done
     """
 }
@@ -626,8 +634,6 @@ workflow {
         // join tab file to CLUSTER_NETWORK clustering output channel by expt name
         // Have to use the combine operator because the key (expt_name)
         // is not unique, because the networks are clustered with different inflation params
-        CREATE_BASE_NETWORK.out.tab_file.view()
-        CLUSTER_NETWORK.out.clustering.view()
         tab_ch = CREATE_BASE_NETWORK.out.tab_file
             .combine(CLUSTER_NETWORK.out.clustering, by: 0)
 
@@ -654,12 +660,6 @@ workflow {
             GET_ANNO_GET_GO_ANNO.out.go_anno_file
         )
 
-        base_network_ch = CREATE_BASE_NETWORK.out.tpms_file
-            .join(CREATE_BASE_NETWORK.out.tab_file)
-            .join(CREATE_BASE_NETWORK.out.base_network)
-            .map { _expt, tpms, tab, base -> [tpms, tab, base]} // remove expt. not needed
-            .collect()
-
         filtered_network_ch = filtered_ch.map { _expt, mcx -> mcx }
             .collect()
         // stats files from clustering
@@ -678,15 +678,15 @@ workflow {
             .map { _name, mcx, graphml, node, edges, go_out_files -> [ mcx, graphml, node, edges, go_out_files ] }
             .flatten()
             .collect()
-            .view()
 
         expts_ch = sample_files.map { expt, _samples_file -> [ expt, "knn" ] }
         PUBLISH_NETWORKS(
             expts_ch,
             RUN_POST_GBA_STATS.out.tsv,
-            base_network_ch,
+            // base_network_ch,
+            filtered_network_ch,
             stats_files_ch,
-            graph_files_with_go_ch,                         // [ mcx, graphml, node, edges, GO_files]
+            graph_files_with_go_ch,                         // [ mcx.I*, graphml, node, edges, GO_files]
             auc_files_ch,
             RUN_GUILT_BY_ASSOCIATION.out.gba_out.flatten().collect()
         )
