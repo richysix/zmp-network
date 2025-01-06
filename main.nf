@@ -44,12 +44,12 @@ process LOG_INFO {
 // to each separate experiment
 // see README
 process SUBSET_COUNTS {
-    label 'process_high'
+    label 'process_medium'
     publishDir "results", pattern: "expts.txt"
 
     input: 
-    val sample_file
-    val all_counts_file
+    path(sample_file)
+    path(all_counts_file)
 
     output:
     path("expts.txt"),               emit: expts_file
@@ -167,7 +167,7 @@ process TEST_PARAMETERS {
 
 // Filter network by correlation threshold using MCL
 process FILTER_COR {
-    label 'process_low'
+    label 'process_medium'
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/mcl:14.137--0':
         'biocontainers/mcl:14.137--0' }"
@@ -202,7 +202,7 @@ process FILTER_COR {
 
 // Filter network by K-nearest-neighbours using MCL
 process FILTER_KNN {
-    label 'process_low'
+    label 'process_medium'
 
     input:
     tuple val(dir), path(mcx_file)
@@ -274,7 +274,7 @@ process FILTER_STATS {
 
 // Cluster network
 process CLUSTER_NETWORK {
-    label 'process_single'
+    label 'process_low'
     
     input:
     tuple val(dir), path(mcx_file)
@@ -425,7 +425,7 @@ process RUN_POST_GBA_STATS {
 }
 
 process RUN_GO_ENRICHMENT {
-    label 'process_single'
+    label 'process_long'
 
     input:
     tuple path(cluster_file), path(graphml_file),
