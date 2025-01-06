@@ -21,13 +21,17 @@ process LOG_INFO {
     NETWORK CONSTRUCTION PIPELINE
     -----------------------------
 
-    Clustering: ${params.clustering}
-    Debug: ${params.debug}
-    Expt to sample file: ${params.samples}
-    All counts file: ${params.all_counts}
-    Threshold params: ${params.threshold}
-    KNN params: ${params.knn}
-    Inflation Params: ${params.inflation_params}
+    Clustering:             ${params.clustering}
+    Debug:                  ${params.debug}
+    Expt to sample file:    ${params.samples}
+    All counts file:        ${params.all_counts}
+    Reference dir:          ${params.ref_dir}
+    Transcript File:        ${params.transcript_file}
+    Annotation File:        ${params.annotation_file}
+    Go Annotation File:     ${params.go_annotation_file}
+    Threshold params:       ${params.threshold}
+    KNN params:             ${params.knn}
+    Inflation Params:       ${params.inflation_params}
     """
 
     stub:
