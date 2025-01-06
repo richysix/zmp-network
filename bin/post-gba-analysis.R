@@ -120,8 +120,10 @@ auc_line_points <- auc_data |>
              labeller = labeller(domain = \(x) toupper(x))) +
   scale_colour_manual(values = biovisr::cbf_palette(factor(auc_data$inflation)),
                   labels = divide_by_10) +
-  scale_shape_discrete(name = "Value", labels = c("Mean AUC", "Mean null AUC"))
-  
+  scale_shape_discrete(name = "Value", labels = c("Mean AUC", "Mean null AUC")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
 auc_diff <- ggplot(data = auc_data) +
   geom_col(aes(x = params, y = diff, fill = inflation),
            position = position_dodge()) +
