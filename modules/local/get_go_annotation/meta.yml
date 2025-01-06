@@ -1,0 +1,29 @@
+name: get_go_annotation
+description: Get GO annotation
+keywords:
+  - Gene Ontology
+  - annotation
+tools:
+  - get-go-annotation.sh:
+      description: |
+        Shell script to download GO annotation data from the topgo-wrapper package
+      homepage: https://github.com/iansealy/topgo-wrapper
+      documentation: https://github.com/iansealy/topgo-wrapper
+      licence: ["GPL3"]
+input:
+  - species:
+    type: value
+    description: |
+      Name of species to get annotation for (genus_species)
+      e.g. danio_rerio
+  - ensemblVersionGO:
+    type: value
+    description: Ensembl version number to get GO annotation for
+output:
+  - go_file:
+    type: file
+    description: GO annotation file
+authors:
+  - "@richysix"
+maintainers:
+  - "@richysix"
