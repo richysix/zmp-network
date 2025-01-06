@@ -7,40 +7,32 @@ def convert_species_lc_nospace (species) {
 process GET_ANNOTATION {
     // tag "$meta.id"
     label 'process_single'
-    publishDir "reference", pattern: "$outFile"
 
     input:
     val(species)
     val(ensemblVersion)
-    val(scriptURL)
-    val(bashURL)
 
     output:
-    path("$outFile")
+    path("$out_file")
 
     script:
-    species_lc_nospace = convert_species_lc_nospace(species)
-    outFile = species_lc_nospace + "-e" + ensemblVersion + "-annotation.txt"
     // convert species to lower case and remove spaces
+    species_lc_nospace = convert_species_lc_nospace(species)
+    out_file = species_lc_nospace + "-e" + ensemblVersion + "-annotation.txt"
     """
-    # Download get annotation scripts
-    wget $scriptURL
-    wget $bashURL
-    # make it executable
-    chmod a+x get_ensembl_gene_annotation.pl get_ensembl_gene_annotation.sh
-    # Run 
-    ./get_ensembl_gene_annotation.sh -s "$species" -e $ensemblVersion -o $outFile
+    module load Ensembl/${ensemblVersion}
+    get_ensembl_gene_annotation.pl --species "${species}" > ${out_file}
     """
 }
 
 // Workflow for testing the GET_ANNOTATION process
-params.get_anno_script_url="https://github.com/iansealy/bio-misc/raw/4e27d60323907d55d37a1ec8f468ca771f542f78/get_ensembl_gene_annotation.pl"
-params.get_anno_bash_url="https://github.com/richysix/uge-job-scripts/raw/e5f5faad28b23ff55419726beef3675f9e5fdba3/get_ensembl_gene_annotation.sh"
-params.ensembl_version="100"
-params.species='danio_rerio'
+// params.ensembl_version="100"
+// params.species='danio_rerio'
 workflow GET_ANNOTATION_WF {
-    GET_ANNOTATION(params.species, params.ensembl_version, params.get_anno_script_url, params.get_anno_bash_url)
-        .view()
+    GET_ANNOTATION(
+        params.species,
+        params.ensembl_version
+    ).view()
 }
 
 process GET_GO_ANNOTATION {
@@ -51,7 +43,6 @@ process GET_GO_ANNOTATION {
     input:
     val(species)
     val(ensemblVersionGO)
-    val(bashURL)
 
     output:
     path("*_e*_go.txt")
@@ -59,21 +50,17 @@ process GET_GO_ANNOTATION {
     script:
     species_lc_nospace = convert_species_lc_nospace(species)
     """
-    # Download get annotation scripts
-    wget $bashURL
-    # make it executable
-    chmod a+x get-go-annotation.sh
-    ./get-go-annotation.sh -s $species_lc_nospace -e $ensemblVersionGO
+    get-go-annotation.sh -s $species_lc_nospace -e $ensemblVersionGO
     """
 }
 
 // Workflow for testing the GET_GO_ANNOTATION process
-// nextflow.enable.moduleBinaries = true
-params.get_go_anno_bash_url="https://github.com/richysix/uge-job-scripts/raw/e5f5faad28b23ff55419726beef3675f9e5fdba3/get-go-annotation.sh"
-params.ensembl_versionGO="105"
+// params.ensembl_versionGO="105"
 workflow GET_GO_ANNOTATION_WF {
-    GET_GO_ANNOTATION(params.species, params.ensembl_versionGO, params.get_go_anno_bash_url)
-        .view()
+    GET_GO_ANNOTATION(
+        params.species,
+        params.ensembl_versionGO
+    ).view()
 }
 
 // For testing

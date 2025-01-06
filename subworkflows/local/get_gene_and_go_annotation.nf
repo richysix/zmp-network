@@ -15,7 +15,7 @@ workflow GET_ANNO_GET_GO_ANNO {
     main:
     // Check if annotation file already exists
     if (ch_anno.anno_file.exists()) {
-        ch_anno_file = Channel.of(ch_anno.anno_file)
+        ch_anno_file = Channel.value(ch_anno.anno_file)
         if ( params.debug > 1) {
             println("Annotation file exists")
             ch_anno_file.view { x -> "Annotation file: $x" }
@@ -23,10 +23,8 @@ workflow GET_ANNO_GET_GO_ANNO {
     } else {
         ch_anno_file = GET_ANNOTATION(
             ch_species,
-            ch_anno.version,
-            ch_anno.anno_script_url,
-            ch_anno.anno_bash_url
-        )
+            ch_anno.version
+        ).collect()
         if ( params.debug > 1) {
             println("Annotation file does NOT exist. Downloading...")
             ch_anno_file.view { x -> "Annotation file: $x" }
@@ -34,7 +32,7 @@ workflow GET_ANNO_GET_GO_ANNO {
     }
 
     if (ch_go_anno.go_anno_file.exists()) {
-        ch_go_anno_file = Channel.of(ch_go_anno.go_anno_file)
+        ch_go_anno_file = Channel.value(ch_go_anno.go_anno_file)
         if ( params.debug > 1) {
             println("GO annotation file exists")
             ch_go_anno_file.view { x -> "GO annotation file: $x" }
@@ -42,9 +40,8 @@ workflow GET_ANNO_GET_GO_ANNO {
     } else {
         ch_go_anno_file = GET_GO_ANNOTATION(
             ch_species,
-            ch_go_anno.go_version,
-            ch_go_anno.go_bash_url
-        )
+            ch_go_anno.go_version
+        ).collect()
         if ( params.debug > 1) {
             println("GO annotation file does NOT exist. Downloading...")
             ch_go_anno_file.view { x -> "GO annotation file: $x" }
@@ -52,17 +49,14 @@ workflow GET_ANNO_GET_GO_ANNO {
     }
 
     emit:
-    // convert to value channels using .first()
     anno_file = ch_anno_file        // value channel: [ path(annotation_file) ]
     go_anno_file = ch_go_anno_file  // value channel: [ path(GO_annotation_file) ]
 }
 
-params.get_anno_script_url="https://github.com/iansealy/bio-misc/raw/4e27d60323907d55d37a1ec8f468ca771f542f78/get_ensembl_gene_annotation.pl"
-params.get_anno_bash_url="https://github.com/richysix/uge-job-scripts/raw/e5f5faad28b23ff55419726beef3675f9e5fdba3/get_ensembl_gene_annotation.sh"
-params.ensembl_version="100"
-params.species='danio_rerio'
-params.get_go_anno_bash_url="https://github.com/richysix/uge-job-scripts/raw/e5f5faad28b23ff55419726beef3675f9e5fdba3/get-go-annotation.sh"
-params.ensembl_versionGO="105"
+// For testing
+// params.ensembl_version="100"
+// params.species='danio_rerio'
+// params.ensembl_versionGO="105"
 workflow {
     GET_ANNO_GET_GO_ANNO(
         params.species,
