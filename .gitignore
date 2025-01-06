@@ -168,6 +168,5 @@ cython_debug/
 nf
 plots
 
-# Scripts from other repos
-get-go-annotation.sh
-test-include.nf
+# test scripts
+test-*.nf

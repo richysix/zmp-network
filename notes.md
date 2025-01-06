@@ -850,12 +850,12 @@ du -sh results/ work/
 125G    results/
 1.6T    work/
 
-24G     results/zmp_ph192
-21G     results/zmp_ph250
-19G     results/zmp_ph238
-15G     results/zmp_ph46
-19G     results/zmp_ph213
-18G     results/zmp_ph204
-13G     results/zmp_ph71
+24G     results/zmp_ph192
+21G     results/zmp_ph250
+19G     results/zmp_ph238
+15G     results/zmp_ph46
+19G     results/zmp_ph213
+18G     results/zmp_ph204
+13G     results/zmp_ph71
 
 find work/ -type f | xargs ls -l | awk '{print $9, $5}' | sed -e 's|work.*/||' | grep zmp | sed -e 's|-all.* | |' | sort -k1,1 | datamash -W -g 1 sum 2 | awk '{ print $1, $2/1024/1024/1024 "G"}'
