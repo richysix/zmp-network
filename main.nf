@@ -88,6 +88,7 @@ process CREATE_BASE_NETWORK {
 
     input: 
     tuple val(expt), path(sample_file), path(count_file)
+    path(transcript_file)
 
     output:
     tuple val(expt), path("${expt}-all-tpm.tsv"),       emit: tpms_file
@@ -103,9 +104,9 @@ process CREATE_BASE_NETWORK {
 
     module load R/${params.r_version}
     counts-to-fpkm-tpm.R \
-    --transcripts_file $params.transcript_file \
+    --transcripts_file ${transcript_file} \
     --output_base ${expt}-all --output_format tsv \
-    --tpm ${expt}-samples.txt $count_file
+    --tpm ${expt}-samples.txt ${count_file}
 
     module load MCL/$params.mcl_version
 
@@ -538,7 +539,10 @@ workflow {
         LOG_INFO()
     }
     // Subset counts file to expts
-    SUBSET_COUNTS(params.samples, params.all_counts)
+    SUBSET_COUNTS(
+        file(params.samples),
+        file(params.all_counts)
+    )
     // extract expt name from path to use as join key
     // it.parent.baseName gets final directory name (e.g. test-1 from /work/78/810e9b6891dd6476b1474a90983952/test-1/samples.tsv)
     sample_files = SUBSET_COUNTS.out.sample_files
@@ -559,7 +563,10 @@ workflow {
     }
 
     // Create a network for each expt
-    CREATE_BASE_NETWORK(files_by_expt)
+    CREATE_BASE_NETWORK(
+        files_by_expt,
+        file(params.transcript_file)
+    )
 
     // Test a range of filtering parameters
     TEST_PARAMETERS(CREATE_BASE_NETWORK.out.filtered_network)
@@ -595,7 +602,7 @@ workflow {
     stats_ch = TEST_PARAMETERS.out.vary_threshold_stats.collect()
     FILTER_STATS(
         SUBSET_COUNTS.out.expts_file,
-        params.samples,
+        file(params.samples),
         cor_hist_ch,
         stats_ch,
         filtered_stats_ch
@@ -613,13 +620,16 @@ workflow {
         // Get annotation if necessary
         GET_ANNO_GET_GO_ANNO(
             params.species,
-            [ anno_file: file(params.annotation_file), 
-            version: params.ensembl_version,
-            anno_script_url: params.get_anno_script_url,
-            anno_bash_url: params.get_anno_bash_url ],
-            [ go_anno_file: file(params.go_annotation_file),
-            go_version: params.ensembl_versionGO,
-            go_bash_url: params.get_go_anno_bash_url ]
+            [ 
+                anno_file: file(params.annotation_file), 
+                version: params.ensembl_version
+            // anno_script_url: params.get_anno_script_url,
+            // anno_bash_url: params.get_anno_bash_url 
+            ],
+            [ 
+                go_anno_file: file(params.go_annotation_file),
+                go_version: params.ensembl_versionGO
+            ]
         )
         if ( params.debug > 1 ) {
             GET_ANNO_GET_GO_ANNO.out.anno_file.view { x -> "Annotation file: $x" }
@@ -649,13 +659,13 @@ workflow {
             tab_ch,                                 // [ expt_name, tab_file, mcx_file, cluster_file ]
             GET_ANNO_GET_GO_ANNO.out.anno_file,     // [ gene_annotation_file ]
             GET_ANNO_GET_GO_ANNO.out.go_anno_file,  // [ GO_annotation_file ]
-            channel.value(params.zfa_file)          // [ ZFA_annotation_file ]
+            channel.value(file(params.zfa_file))    // [ ZFA_annotation_file ]
         )
 
         auc_files_ch = RUN_GUILT_BY_ASSOCIATION.out.auc_files.collect()
         RUN_POST_GBA_STATS(
             SUBSET_COUNTS.out.expts_file,
-            params.samples,
+            file(params.samples),
             auc_files_ch,
             CLUSTER_NETWORK.out.cluster_sizes.collect()
         )
@@ -710,7 +720,6 @@ workflow {
             RUN_POST_GBA_STATS.out.tsv.view { x -> "RUN_POST_GBA_STATS tsv files: $x" }
             RUN_POST_GBA_STATS.out.html.view { x -> "RUN_POST_GBA_STATS html files: $x" }
 
-            base_network_ch.view { x -> "tpms, tab, base: $x" }
             filtered_network_ch.view { x -> "filtered mcx: $x" }
             graph_files_with_go_ch.view { x -> "Graph files with GO enrichment: $x" }
         }
