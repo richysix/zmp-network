@@ -19,12 +19,3 @@ process GET_GO_ANNOTATION {
     """
 }
 
-// Workflow for testing the GET_GO_ANNOTATION process
-// params.ensembl_versionGO="105"
-workflow GET_GO_ANNOTATION_WF {
-    GET_GO_ANNOTATION(
-        params.species,
-        params.ensembl_versionGO
-    ).view()
-}
-

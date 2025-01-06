@@ -24,13 +24,3 @@ process GET_ANNOTATION {
     get_ensembl_gene_annotation.pl --species "${species}" > ${out_file}
     """
 }
-
-// Workflow for testing the GET_ANNOTATION process
-// params.ensembl_version="100"
-// params.species='danio_rerio'
-workflow GET_ANNOTATION_WF {
-    GET_ANNOTATION(
-        params.species,
-        params.ensembl_version
-    ).view()
-}
