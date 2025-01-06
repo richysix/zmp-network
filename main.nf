@@ -79,9 +79,11 @@ process SUBSET_COUNTS {
 // in TEST_PARAMETERS (smaller to load into memory)
 process CREATE_BASE_NETWORK {
     label 'process_medium'
-    publishDir "results/${expt}", pattern: "${expt}-all-tpm.tsv"
-    publishDir "results/${expt}", pattern: "${expt}-all-tpm.tab"
-    publishDir "results/${expt}", pattern: "${expt}-all-tpm-orig.mcx"
+    // publishDir "results/${expt}", pattern: "${expt}-all-tpm.tsv"
+    // publishDir "results/${expt}", pattern: "${expt}-all-tpm.tab"
+    // publishDir "results/${expt}", pattern: "${expt}-all-tpm-orig.mcx"
+    publishDir path: "${params.outdir}/${expt}", mode: params.publish_dir_mode,
+        pattern: "${expt}-all-tpm{-orig.mcx,.tsv,.tab}"
 
 
     input: 
@@ -489,7 +491,8 @@ process RUN_GO_ENRICHMENT {
 
 process PUBLISH_NETWORKS {
     label 'process_single'
-    publishDir "results", pattern: "${expt}/*"
+    publishDir path: params.outdir, mode: params.publish_dir_mode,
+        pattern: "${expt}/*"
 
     input:
     tuple val(expt), val(method) // name of experiment
