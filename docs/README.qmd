@@ -4,6 +4,8 @@ format: gfm
 editor: source
 ---
 
+![](schematic.excalidraw.svg)
+
 ## Processes
 
 {{< include _dag-current.md >}}
