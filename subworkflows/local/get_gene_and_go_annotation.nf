@@ -3,7 +3,7 @@
 //
 
 include { GET_ANNOTATION     } from '../../modules/local/get_annotation/main'
-include { GET_GO_ANNOTATION  } from '../../modules/local/get_annotation/main'
+include { GET_GO_ANNOTATION  } from '../../modules/local/get_go_annotation/main'
 include { convert_species_lc_nospace } from '../../modules/local/get_annotation/main'
 
 workflow GET_ANNO_GET_GO_ANNO {
