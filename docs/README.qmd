@@ -8,8 +8,6 @@ editor: source
 
 ## Processes
 
-{{< include _dag-current.md >}}
-
 ### SUBSET (big_mem_retry)
 
 Creates a sample and count file for each individual experiment with the counts
@@ -258,4 +256,8 @@ Tuple of
 
 Script:
 Runs `create_files_for_topgo.py` and `run_topgo.pl`
+
+## Process DAG
+
+{{< include _dag-current.md >}}
 
