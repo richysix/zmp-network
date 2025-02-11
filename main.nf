@@ -83,7 +83,7 @@ process CREATE_BASE_NETWORK {
     // publishDir "results/${expt}", pattern: "${expt}-all-tpm.tab"
     // publishDir "results/${expt}", pattern: "${expt}-all-tpm-orig.mcx"
     publishDir path: "${params.outdir}/${expt}", mode: params.publish_dir_mode,
-        pattern: "${expt}-all-tpm{-orig.mcx,.tsv,.tab}"
+        pattern: "${expt}-all-tpm{-orig.mcx,-orig.cor-hist.txt,.tsv,.tab,}"
 
 
     input: 
@@ -106,12 +106,20 @@ process CREATE_BASE_NETWORK {
     counts-to-fpkm-tpm.R \
     --transcripts_file ${transcript_file} \
     --output_base ${expt}-all --output_format tsv \
-    --tpm ${expt}-samples.txt ${count_file}
+    --tpm --filter_threshold ${params.high_cor_filter_threshold} \
+    ${expt}-samples.txt ${count_file}
 
     module load MCL/$params.mcl_version
 
-    # make network with all edges in
+    # make network with all genes and edges in
     mcxarray -data ${expt}-all-tpm.tsv -co 0 \
+    $params.skip_rows $params.skip_cols \
+    $params.cor_measure $params.labels \
+    --write-binary -o ${expt}-all-tpm-orig.mcx \
+    -write-tab ${expt}-all-tpm.tab
+
+    # make network with filtered gene set, all edges
+    mcxarray -data ${expt}-all-tpm-filtered-by-zeros.tsv -co 0 \
     $params.skip_rows $params.skip_cols \
     $params.cor_measure $params.labels \
     --write-binary -o ${expt}-all-tpm-orig.mcx \

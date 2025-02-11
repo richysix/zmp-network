@@ -10,9 +10,11 @@ option_list <- list(
   make_option("--gtf_file", action="store", default="../reference/grcz11/Danio_rerio.GRCz11.111.gtf",
               help="GTF annotation file [default %default]"),
   make_option("--fpkm", action="store_true", default=FALSE,
-              help="Create and output fpkm [default %default]"),
+              help="Create and output FPKM [default %default]"),
   make_option("--tpm", action="store_true", default=TRUE,
-              help="Create and output fpkm [default %default]"),
+              help="Create and output TPM [default %default]"),
+  make_option("--filter_threshold", action="store", default=NULL, type = "integer",
+              help="Number of correlations above 0.9 to filter based on [default %default]"),
   make_option("--output_base", action="store", default="all",
               help="Base filename of output files [default %default]"),
   make_option("--output_format", action="store", default="tsv",
@@ -37,7 +39,7 @@ cmd_line_args <- parse_args(
   positional_arguments = 2
 )
 
-packages <- c('DESeq2', 'rnaseqtools', 'dplyr', 'readr', 'tibble')
+packages <- c('DESeq2', 'rnaseqtools', 'dplyr', 'readr', 'tibble', 'purrr')
 for( package in packages ){
     suppressPackageStartupMessages( suppressWarnings( library(package, character.only = TRUE) ) )
 }
@@ -96,7 +98,7 @@ if (!is.null(cmd_line_args$options$transcripts_file) &
   # calculate lengths of transcripts
   exonsByGene <- exonsBy(txdb, by="gene")
   TxLengths <- sapply(exonsByGene, 
-                      function(gene){ reduce(gene) |> width() |> sum() }
+                      function(gene){ GenomicRanges::reduce(gene) |> GenomicRanges::width() |> sum() }
   )
   if (!is.null(cmd_line_args$options$transcripts_file)) {
     write.table(TxLengths, file=cmd_line_args$options$transcripts_file, 
@@ -143,26 +145,124 @@ tpm <- inner_join(
   by = join_by(GeneID == GeneID)
 )
 
+# function to calculate the correlation coefficient for a subset of genes
+# compared to all genes and return the number > 0.9
+calculate_cor_values_vs_all_genes <- function(
+    tpm_df, tpm_no_all_zeros, samples, label, write_func) {
+  a <- tpm_df |>
+    dplyr::select(starts_with("zmp")) |>
+    t()
+  colnames(a) <- tpm_df$GeneID
+  b <- tpm_no_all_zeros |>
+    dplyr::select(starts_with("zmp")) |>
+    t()
+  colnames(b) <- tpm_no_all_zeros$GeneID
+  # reorder to put the genes in "a" first
+  b <- b[ , c(colnames(a), setdiff(colnames(b), colnames(a))) ]
+  # calculate cor vs all other genes
+  c <- cor(a, b, method = "spearman")
+  # set cells where gene1 == gene2 to NA
+  num_rows <- nrow(tpm_df)
+  c[ seq(1,num_rows^2,num_rows + 1) ] <- NA
+  # get just combinations > 0.9
+  indices <- which(c > 0.9)
+  col_i <- as.integer((indices - 1) / nrow(c)) + 1
+  row_i <- ((indices - 1) %% nrow(c)) + 1
+  # remove duplicates by insisting col_i > row_i
+  to_keep <- col_i > row_i
+  indices <- indices[ to_keep ]
+  col_i <- col_i[ to_keep ]
+  row_i <- row_i[ to_keep ]
+  # output the suspect ones
+  cor_by_num_zeros_out_file <- paste0(cmd_line_args$options$output_base,
+                                      "-cor-by-num-zeros-", label, ".",
+                                      cmd_line_args$options$output_format)
+  tibble(
+    Gene1 = rownames(c)[ row_i ],
+    Gene2 = colnames(c)[ col_i ],
+    cor = c[ indices ],
+  ) |>
+    arrange(cor) |>
+    write_func(file = cor_by_num_zeros_out_file)
+  
+  # return count of correlations over 0.9
+  return(length(indices))
+}
+
+# function to check where to pick the zeros threshold
+filter_by_zeros <- function(tpm_df, samples, cor_count_threshold = 50, write_func) {
+  t_tpm <- tpm_df |>
+    dplyr::select(-c(GeneID, Name)) |>
+    t()
+  tpm_no_all_zeros <- tpm_df |>
+    dplyr::mutate(num_zeros = apply(t_tpm, 2, \(x) (x == 0) |> sum())) |>
+    dplyr::filter(num_zeros != nrow(samples))
+  tpm_by_zeros <- split(tpm_no_all_zeros, tpm_no_all_zeros$num_zeros)
+  num_genes <-   tpm_by_zeros |>
+    purrr::imap(\(x, idx) { tibble(
+      num_zeros = idx,
+      num_genes = nrow(x),
+      "cor_gt_0.9" = NA_integer_,
+    )}) |> 
+    purrr::list_rbind() |> 
+    dplyr::mutate(cumul_genes = cumsum(num_genes))
+  
+  rev_num_zeros <- names(tpm_by_zeros) |> as.integer() |>
+    sort(decreasing = TRUE) |> as.character()
+  for (num_zeros in rev_num_zeros) {
+    cor_gt_0.9 <- calculate_cor_values_vs_all_genes(
+      tpm_by_zeros[[num_zeros]], tpm_no_all_zeros, samples, num_zeros, write_func
+    )
+    num_genes[ num_genes$num_zeros == num_zeros, "cor_gt_0.9"] <- cor_gt_0.9
+    if (cor_gt_0.9 < cor_count_threshold) {
+      break
+    }
+  }
+  
+  above_threshold <- num_genes$num_zeros[
+    !is.na(num_genes$`cor_gt_0.9`) & num_genes$`cor_gt_0.9` >= cor_count_threshold
+  ]
+  return(dplyr::filter(tpm_no_all_zeros, !(num_zeros %in% above_threshold)))
+}
+
 # output fpkm and tpm
 if (cmd_line_args$options$output_format == "tsv") {
   write_func <- readr::write_tsv
-  fpkm_out_file <- paste0(cmd_line_args$options$output_base, '-fpkm.tsv')
-  tpm_out_file <- paste0(cmd_line_args$options$output_base, '-tpm.tsv')
-  counts_out_file <- paste0(cmd_line_args$options$output_base, '-counts.tsv')
 } else {
   write_func <- readr::write_csv
-  fpkm_out_file <- paste0(cmd_line_args$options$output_base, '-fpkm.csv')
-  tpm_out_file <- paste0(cmd_line_args$options$output_base, '-tpm.csv')
-  counts_out_file <- paste0(cmd_line_args$options$output_base, '-counts.csv')
 }
 if (cmd_line_args$options$fpkm) {
+  fpkm_out_file <- paste0(cmd_line_args$options$output_base, "-fpkm.",
+                          cmd_line_args$options$output_format)
   write_func(rnaseq_fpkm, file = fpkm_out_file)
 }
 if (cmd_line_args$options$tpm) {
+  tpm_out_file <- paste0(cmd_line_args$options$output_base, "-tpm.",
+                         cmd_line_args$options$output_format)
   write_func(tpm, file = tpm_out_file)
 }
 
+# filter tpms if filter_threshold set
+if (!is.null(cmd_line_args$options$filter_threshold)) {
+  cor_by_num_zeros_out_file <- paste0(cmd_line_args$options$output_base, 
+                                  "-cor-by-num-zeros.",
+                                  cmd_line_args$options$output_format)
+  tpm_filtered <- filter_by_zeros(
+      tpm,
+      samples, 
+      cor_count_threshold = cmd_line_args$options$filter_threshold,
+      write_func
+    )
+  tpm_filtered_out_file <- paste0(cmd_line_args$options$output_base, 
+                                  "-tpm-filtered-by-zeros.",
+                                  cmd_line_args$options$output_format)
+  
+  write_func(tpm_filtered, file = tpm_filtered_out_file)
+}
+
 # output counts as well
+counts_out_file <- paste0(cmd_line_args$options$output_base, "-counts.",
+                          cmd_line_args$options$output_format)
 rnaseq_data |> dplyr::select(-any_of(pval_cols)) |> 
   write_func(file = counts_out_file)
 

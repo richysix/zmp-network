@@ -3,7 +3,7 @@ Correlation network of zebrafish development
 
 ## Setup
 ```
-scratch 
+scratch
 cd detct/grcz11/
 export gitdir=$HOME/checkouts/zmp-network
 export basedir=$(pwd)
@@ -313,7 +313,7 @@ all-tpm-t60.mci all-tpm-t60.mci.I40 node_id-gene_id-gene_name.txt \
 
 Move output to new directory
 ```
-scratch 
+scratch
 mkdir zmp-network
 cp -a detct/grcz11/nf zmp-network/
 cd zmp-network
