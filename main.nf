@@ -348,24 +348,24 @@ process RUN_GUILT_BY_ASSOCIATION {
 
     output:
     tuple path(cluster_file),
-        path("${dir}-all-tpm*.graphml"),
-        path("${dir}-all-tpm*.nodes.tsv"),
-        path("${dir}-all-tpm*.edges.tsv"),              emit: graph_files
-    path("${dir}-all-tpm*.auc.tsv"),                    emit: auc_files
-    tuple path("${dir}-all-tpm*.gene-scores.tsv"), 
-        path("${dir}-all-tpm*.GBA-plots.pdf"),          emit: gba_out
+        path("${cluster_file}.graphml"),
+        path("${cluster_file}.nodes.tsv"),
+        path("${cluster_file}.edges.tsv"),              emit: graph_files
+    path("${cluster_file}.{go,zfa}.auc.tsv"),                    emit: auc_files
+    tuple path("${cluster_file}.*.gene-scores.tsv"), 
+        path("${cluster_file}.*.GBA-plots.pdf"),          emit: gba_out
 
     script:
-    matches = (mcx_file =~ /all-tpm-(t?)(\d*)-?(k?)(\d*).mcx$/)
+    matches = (mcx_file =~ /tpm-filtered-(t?)(\d*)-?(k?)(\d*).mcx$/)
     t_num = get_threshold(matches)
     if (params.debug > 1 ){
         println("GBA: Threshold value = " + t_num)
     }
+    mcx_base = mcx_file.baseName
     """
     # convert from binary
     module load MCL/${params.mcl_version}
-    mcx_base=\$( basename ${mcx_file} .mcx)
-    mcx convert ${mcx_file} \${mcx_base}.mci
+    mcx convert ${mcx_file} ${mcx_base}.mci
 
     # run convert_mcl script
     module load Python/${params.python_version}
@@ -375,7 +375,7 @@ process RUN_GUILT_BY_ASSOCIATION {
     --nodes_file ${cluster_file}.nodes.tsv \
     --edges_file ${cluster_file}.edges.tsv \
     --edge_offset ${t_num} \
-    \${mcx_base}.mci ${cluster_file} ${tab_file} ${annotation_file}
+    ${mcx_base}.mci ${cluster_file} ${tab_file} ${annotation_file}
 
     module load R/${params.r_version}
     run-GBA-network.R \
@@ -399,12 +399,12 @@ process RUN_GUILT_BY_ASSOCIATION {
 
     stub:
     """
-    for name in edges.tsv go.GBA-plots.pdf go.gene-scores.tsv graphml \
-    nodes.tsv zfa.GBA-plots.pdf zfa.gene-scores.tsv
+    for name in nodes.tsv edges.tsv graphml \
+    go.auc.tsv go.GBA-plots.pdf go.gene-scores.tsv \
+    zfa.auc.tsv zfa.GBA-plots.pdf zfa.gene-scores.tsv
     do
         touch ${cluster_file}.\$name
     done
-    touch ${cluster_file}.auc.tsv
     """
 }
 
