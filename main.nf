@@ -179,6 +179,7 @@ process TEST_PARAMETERS {
     """
 
     stub:
+    mcx_base=mcx_file.baseName
     """
     touch ${mcx_base}.vary-cor-stats.tsv ${mcx_base}.vary-knn-stats.tsv
     """
@@ -196,26 +197,26 @@ process FILTER_COR {
     each threshold
 
     output:
-    tuple val(dir), path("${dir}-all-tpm-t[0-9]*.mcx"),     emit: filtered_mcx
-    path("${dir}-all-tpm-t[0-9]*.stats.tsv"),               emit: node_stats
+    tuple val(dir), path("${mcx_base}.mcx"),     emit: filtered_mcx
+    path("${mcx_base}.stats.tsv"),               emit: node_stats
 
     script:
     Integer suffix = threshold * 100
+    mcx_base = mcx_file.baseName.replaceAll("-orig", "") + "-t" + suffix
     """
     mcx alter -imx ${mcx_file} \
     -tf "gt(${threshold}), add(-${threshold})" \
-    --write-binary -o ${dir}-all-tpm-t${suffix}.mcx
-    mcx alter -imx ${dir}-all-tpm-t${suffix}.mcx \
+    --write-binary -o ${mcx_base}.mcx
+    mcx alter -imx ${mcx_base}.mcx \
     -tf "add(${threshold})" | mcx query -imx - > \
-    ${dir}-all-tpm-t${suffix}.stats.tsv
+    ${mcx_base}.stats.tsv
     """
 
     stub:
     Integer suffix = threshold * 100
-    def mcx = "${dir}-all-tpm-t${suffix}.mcx"
-    def stats = "${dir}-all-tpm-t${suffix}.stats.tsv"
+    mcx_base = mcx_file.baseName.replaceAll("-orig", "") + suffix
     """
-    touch ${mcx} ${stats}
+    touch ${mcx_base}.mcx ${mcx_base}.stats.tsv
     """
 }
 
