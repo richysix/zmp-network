@@ -223,35 +223,38 @@ process FILTER_COR {
 // Filter network by K-nearest-neighbours using MCL
 process FILTER_KNN {
     label 'process_medium'
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'https://depot.galaxyproject.org/singularity/mcl:14.137--0':
+        'biocontainers/mcl:14.137--0' }"
 
     input:
     tuple val(dir), path(mcx_file)
     each knn_threshold
 
     output:
-    tuple val(dir), path("${dir}-all-tpm-t[0-9]*-k[0-9]*.mcx"), emit: filtered_mcx
-    path("${dir}-all-tpm-t[0-9]*-k[0-9]*.stats.tsv"),           emit: node_stats
+    tuple val(dir), path("${mcx_base}.mcx"), emit: filtered_mcx
+    path("${mcx_base}.stats.tsv"),           emit: node_stats
 
     script:
     threshold=0.2
     thresholdSuffix=20
+    mcx_base = mcx_file.baseName.replaceAll("-orig", "") + "-t" +
+        thresholdSuffix + "-k" + knn_threshold
     """
-    module load MCL/$params.mcl_version
-
-    knnBase="${dir}-all-tpm-t${thresholdSuffix}-k${knn_threshold}"
     mcx alter -imx ${mcx_file} \
     -tf "abs(), gt(${threshold}), add(-${threshold}), #knn($knn_threshold)" \
-    --write-binary -o \${knnBase}.mcx
+    --write-binary -o ${mcx_base}.mcx
     # stats
-    mcx alter -imx \${knnBase}.mcx -tf "add(${threshold})" | \
-    mcx query -imx - > \${knnBase}.stats.tsv
+    mcx alter -imx ${mcx_base}.mcx -tf "add(${threshold})" | \
+    mcx query -imx - > ${mcx_base}.stats.tsv
     """
 
     stub:
-    def mci = "${dir}-all-tpm-t20-k${knn_threshold}.mcx"
-    def stats = "${dir}-all-tpm-t20-k${knn_threshold}.stats.tsv"
+    thresholdSuffix=20
+    mcx_base = mcx_file.baseName.replaceAll("-orig", "") + "-t" +
+        thresholdSuffix + "-k" + knn_threshold
     """
-    touch ${mci} ${stats}
+    touch ${mcx_base}.mcx ${mcx_base}.stats.tsv
     """
 }
 
