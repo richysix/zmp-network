@@ -283,13 +283,15 @@ process FILTER_STATS {
     stub:
     """
     mkdir -p plots/
-    touch plots/all-cor-dist.pdf plots/cor-stats-node-degrees-close-up.pdf \
+    touch plots/orig-cor-dist.pdf plots/filtered-cor-dist.pdf \
+    plots/cor-stats-node-degrees-close-up.pdf \
     plots/knn-stats-all-components.pdf
     for method in cor knn 
     do
       touch plots/\$method-stats-singletons.pdf plots/\$method-stats-nodes.pdf \
       plots/\$method-stats-nodes-singletons.pdf \
       plots/\$method-stats-node-degrees.pdf \
+      plots/\$method-stats-node-degrees-close-up.pdf \
       plots/\$method-stats-node-degree-distribution.pdf \
       plots/\$method-stats-node-degree-distribution-close-up.pdf
     done
@@ -540,7 +542,7 @@ process PUBLISH_NETWORKS {
     for dir in test-1 test-2
     do
         mkdir -p \$dir
-        base="all-tpm-t20-k3.mcx"
+        base="tpm-filtered-t20-k3.mcx"
         mv \$dir-\$base \$dir/
         mv \$dir-\$base.I14 \$dir/
         for suffix in cl-sizes.tsv stats.tsv \
