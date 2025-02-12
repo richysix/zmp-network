@@ -846,6 +846,32 @@ qsub -m bea -M bty114@qmul.ac.uk \
 ~/checkouts/zmp-network/main.nf
 ```
 
+This is an example command from Ian
+```
+nextflow run ../../zfvarcall/main.nf --input samplesheet.csv --outdir results \
+  --fasta ../../ref/GRCz11.fa --fasta_fai ../../ref/GRCz11.fa.fai --fasta_dict ../../ref/GRCz11.dict --bwa_index ../../ref/bwa \
+  -profile apocrita,apptainer
+```
+
+Test pipeline with stub run
+```
+qlogin -l rocky
+cd /data/scratch/bty114/zmp-network/test-nf
+nextflow run -profile test,local --ref_dir reference -stub-run ~/checkouts/zmp-network/main.nf
+```
+
+Test pipeline run
+```
+qlogin -l rocky
+cd /data/scratch/bty114/zmp-network/test-nf
+nextflow run -profile apptainer,test,local --ref_dir reference ~/checkouts/zmp-network/main.nf
+```
+Running with debugging
+```
+nextflow run -profile apptainer,local,test --ref_dir reference --debug 2 ~/checkouts/zmp-network/main.nf
+```
+
+
 du -sh results/ work/
 125G    results/
 1.6T    work/

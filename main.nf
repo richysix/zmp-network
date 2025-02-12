@@ -79,9 +79,6 @@ process SUBSET_COUNTS {
 // in TEST_PARAMETERS (smaller to load into memory)
 process CREATE_BASE_NETWORK {
     label 'process_medium'
-    // publishDir "results/${expt}", pattern: "${expt}-all-tpm.tsv"
-    // publishDir "results/${expt}", pattern: "${expt}-all-tpm.tab"
-    // publishDir "results/${expt}", pattern: "${expt}-all-tpm-orig.mcx"
     publishDir path: "${params.outdir}/${expt}", mode: params.publish_dir_mode,
         pattern: "${expt}-tpm*{-orig.mcx,-orig.cor-hist.txt,.tsv,.tab,}"
 
@@ -158,30 +155,32 @@ process CREATE_BASE_NETWORK {
 // Test varying threshold and knn parameters
 process TEST_PARAMETERS {
     label 'process_medium'
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'https://depot.galaxyproject.org/singularity/mcl:14.137--0':
+        'biocontainers/mcl:14.137--0' }"
 
     input:
     tuple val(dir), path(mcx_file)
 
     output:
-    tuple path("$dir-all-tpm.vary-cor-stats.tsv"),
-        path("$dir-all-tpm.vary-knn-stats.tsv"),     emit: vary_threshold_stats
+    tuple path("${mcx_base}.vary-cor-stats.tsv"),
+        path("${mcx_base}.vary-knn-stats.tsv"),     emit: vary_threshold_stats
 
     script:
+    mcx_base=mcx_file.baseName
     """
-    module load MCL/$params.mcl_version
-
     # vary correlation
     mcx query -imx ${mcx_file} --vary-correlation \
-    --output-table > ${dir}-all-tpm.vary-cor-stats.tsv
+    --output-table > ${mcx_base}.vary-cor-stats.tsv
 
     # test varying k-nearest neighbours
     mcx query -imx ${mcx_file} -vary-knn $params.knn_test_params \
-    --output-table > ${dir}-all-tpm.vary-knn-stats.tsv
+    --output-table > ${mcx_base}.vary-knn-stats.tsv
     """
 
     stub:
     """
-    touch $dir-all-tpm.vary-cor-stats.tsv $dir-all-tpm.vary-knn-stats.tsv
+    touch ${mcx_base}.vary-cor-stats.tsv ${mcx_base}.vary-knn-stats.tsv
     """
 }
 
