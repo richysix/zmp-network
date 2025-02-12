@@ -214,7 +214,7 @@ process FILTER_COR {
 
     stub:
     Integer suffix = threshold * 100
-    mcx_base = mcx_file.baseName.replaceAll("-orig", "") + suffix
+    mcx_base = mcx_file.baseName.replaceAll("-orig", "") + "-t" + suffix
     """
     touch ${mcx_base}.mcx ${mcx_base}.stats.tsv
     """
