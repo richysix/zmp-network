@@ -67,89 +67,100 @@ colour_palette <- biovisr::cbf_palette(sample_counts$expt,
 ## AUC VALUES
 # function to summarise AUC values
 summarise_auc <- function(filename) {
-  expt <- str_remove(filename, "-all-tpm.*$")
+  expt <- str_remove(filename, "-tpm.*$")
   file_info <- basename(filename) |>
-    str_remove("^.*all-tpm-") |>
+    str_remove("^.*-tpm-filtered-") |>
     str_split_1("\\.")
-  read_tsv(filename, show_col_types = FALSE) |>
-    summarise(
-      mean_auc = mean(auc),
-      mean_null_auc = mean(degree_null_auc)
-    ) |> mutate(
-      diff = mean_auc - mean_null_auc,
-      expt = expt,
-      params = file_info[1],
-      inflation = file_info[3] |> str_remove("I"),
-      domain = file_info[4]
-    )
+  auc_data <- read_tsv(filename, show_col_types = FALSE)
+  if (nrow(auc_data) == 0) {
+    auc_summary <- NULL
+  } else {
+    auc_summary <- auc_data |>
+      summarise(
+        mean_auc = mean(auc),
+        mean_null_auc = mean(degree_null_auc)
+      ) |> mutate(
+        diff = mean_auc - mean_null_auc,
+        expt = expt,
+        params = file_info[1],
+        inflation = file_info[3] |> str_remove("I"),
+        domain = file_info[4]
+      )
+  }
+  return(auc_summary)
 }
 
 auc_files <- list.files(pattern = "*\\.auc\\.tsv", recursive = TRUE)
 
 auc_data <- auc_files |>
   map(summarise_auc) |>
-  list_rbind() |> 
-  mutate(
-    threshold_method = case_when(
-      grepl("-k", params) ~ "knn",
-      TRUE ~ "cor"
-    ), 
-    threshold = case_when(
-      threshold_method == "knn" ~ str_remove(params, "^t[0-9]*-k"),
-      threshold_method == "cor" ~ str_remove(params, "^t"),
-    ),
-    threshold = as.integer(threshold),
-    expt = factor(expt, levels = levels(sample_counts$expt))
-  ) |> 
-  arrange(desc(threshold_method), threshold) |> 
-  mutate(params = factor(params, levels = unique(params)))
-
-dodge <- position_dodge(width = 0.75)
-auc_line_points <- auc_data |> 
-  pivot_longer(cols = c(mean_auc, mean_null_auc)) |> 
-  ggplot(mapping = aes(
-    x = params,
-    y = value,
-    colour = inflation,
-    shape = name,
-    group = interaction(params, inflation)
-  )) +
-  geom_point(position = dodge) +
-  geom_line(position = dodge, show.legend = FALSE) +
-  facet_grid(rows = vars(domain), cols = vars(expt),
-             labeller = labeller(domain = \(x) toupper(x))) +
-  scale_colour_manual(values = biovisr::cbf_palette(factor(auc_data$inflation)),
-                  labels = divide_by_10) +
-  scale_shape_discrete(name = "Value", labels = c("Mean AUC", "Mean null AUC")) +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-auc_diff <- ggplot(data = auc_data) +
-  geom_col(aes(x = params, y = diff, fill = inflation),
-           position = position_dodge()) +
-  facet_grid(rows = vars(domain), cols = vars(expt),
-             labeller = labeller(domain = \(x) toupper(x))) +
-  scale_fill_manual(values = biovisr::cbf_palette(factor(auc_data$inflation)),
-                    labels = divide_by_10) +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-miscr::open_graphics_device(
-  filename = file.path(plot_dir, "auc-diff.pdf"),
-  width = 12,
-  height = 4.8
-)
-print(auc_line_points)
-print(auc_diff)
-dev.off()
+  list_rbind()
+if (nrow(auc_data) == 0) {
+  warning("No AUC data. Skipping AUC plots...")
+} else {
+  auc_data |> 
+    mutate(
+      threshold_method = case_when(
+        grepl("-k", params) ~ "knn",
+        TRUE ~ "cor"
+      ), 
+      threshold = case_when(
+        threshold_method == "knn" ~ str_remove(params, "^t[0-9]*-k"),
+        threshold_method == "cor" ~ str_remove(params, "^t"),
+      ),
+      threshold = as.integer(threshold),
+      expt = factor(expt, levels = levels(sample_counts$expt))
+    ) |> 
+    arrange(desc(threshold_method), threshold) |> 
+    mutate(params = factor(params, levels = unique(params)))
+  
+  dodge <- position_dodge(width = 0.75)
+  auc_line_points <- auc_data |> 
+    pivot_longer(cols = c(mean_auc, mean_null_auc)) |> 
+    ggplot(mapping = aes(
+      x = params,
+      y = value,
+      colour = inflation,
+      shape = name,
+      group = interaction(params, inflation)
+    )) +
+    geom_point(position = dodge) +
+    geom_line(position = dodge, show.legend = FALSE) +
+    facet_grid(rows = vars(domain), cols = vars(expt),
+               labeller = labeller(domain = \(x) toupper(x))) +
+    scale_colour_manual(values = biovisr::cbf_palette(factor(auc_data$inflation)),
+                        labels = divide_by_10) +
+    scale_shape_discrete(name = "Value", labels = c("Mean AUC", "Mean null AUC")) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+  auc_diff <- ggplot(data = auc_data) +
+    geom_col(aes(x = params, y = diff, fill = inflation),
+             position = position_dodge()) +
+    facet_grid(rows = vars(domain), cols = vars(expt),
+               labeller = labeller(domain = \(x) toupper(x))) +
+    scale_fill_manual(values = biovisr::cbf_palette(factor(auc_data$inflation)),
+                      labels = divide_by_10) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+  miscr::open_graphics_device(
+    filename = file.path(plot_dir, "auc-diff.pdf"),
+    width = 12,
+    height = 4.8
+  )
+  print(auc_line_points)
+  print(auc_diff)
+  dev.off()
+}
 
 # CLUSTER SIZES
 # function to load cluster size data
 load_cluster_sizes <- function(filename) {
   # parse filename for info
-  expt <- str_remove(filename, "-all-tpm.*$")
+  expt <- str_remove(filename, "-tpm.*$")
   file_info <- basename(filename) |> 
-    str_remove("^.*all-tpm-") |> 
+    str_remove("^.*-tpm-filtered-") |> 
     str_split_1("\\.")
   # read in data and add metadata
   read_tsv(filename, show_col_types = FALSE) |> 
