@@ -83,7 +83,7 @@ process CREATE_BASE_NETWORK {
     // publishDir "results/${expt}", pattern: "${expt}-all-tpm.tab"
     // publishDir "results/${expt}", pattern: "${expt}-all-tpm-orig.mcx"
     publishDir path: "${params.outdir}/${expt}", mode: params.publish_dir_mode,
-        pattern: "${expt}-all-tpm{-orig.mcx,-orig.cor-hist.txt,.tsv,.tab,}"
+        pattern: "${expt}-tpm*{-orig.mcx,-orig.cor-hist.txt,.tsv,.tab,}"
 
 
     input: 
@@ -91,61 +91,70 @@ process CREATE_BASE_NETWORK {
     path(transcript_file)
 
     output:
-    tuple val(expt), path("${expt}-all-tpm.tsv"),       emit: tpms_file
-    tuple val(expt), path("${expt}-all-tpm.tab"),       emit: tab_file // mapping of node ids to Ensembl gene ids
-    tuple val(expt), path("${expt}-all-tpm-orig.mcx"),  emit: base_network
-    tuple val(expt), path("${expt}-all-tpm-t20.mcx"),   emit: filtered_network
-    path("${expt}-all-tpm-orig.cor-hist.txt"),          emit: cor_hist
+    tuple val(expt), path("${expt}-tpm.tsv"),                       emit: tpms_file
+    tuple val(expt), path("${expt}-tpm.tab"),                       emit: tab_file // mapping of node ids to Ensembl gene ids
+    tuple val(expt), path("${expt}-tpm-orig.mcx"),                  emit: base_network
+    tuple val(expt), path("${expt}-tpm-filtered-by-zeros.tsv"),     emit: filtered_tpms_file
+    tuple val(expt), path("${expt}-tpm-filtered.tab"),              emit: filtered_tab_file // mapping of node ids to Ensembl gene ids
+    tuple val(expt), path("${expt}-tpm-filtered-orig.mcx"),         emit: filtered_network
+    tuple val(expt), path("${expt}-tpm-filtered-t20.mcx"),          emit: filtered_t20_network
+    path("${expt}-tpm-orig.cor-hist.txt"),                          emit: cor_hist
+    path("${expt}-tpm-filtered-orig.cor-hist.txt"),                 emit: filtered_cor_hist
 
     script:
     """
     awk -F"\\t" '{if(NR > 1){ print \$2 "\\t" \$3 }}' \
-     ${sample_file} > ${expt}-samples.txt
+        ${sample_file} > ${expt}-samples.txt
 
     module load R/${params.r_version}
     counts-to-fpkm-tpm.R \
     --transcripts_file ${transcript_file} \
-    --output_base ${expt}-all --output_format tsv \
+    --output_base ${expt} --output_format tsv \
     --tpm --filter_threshold ${params.high_cor_filter_threshold} \
     ${expt}-samples.txt ${count_file}
 
     module load MCL/$params.mcl_version
 
     # make network with all genes and edges in
-    mcxarray -data ${expt}-all-tpm.tsv -co 0 \
+    mcxarray -data ${expt}-tpm.tsv -co 0 \
     $params.skip_rows $params.skip_cols \
     $params.cor_measure $params.labels \
-    --write-binary -o ${expt}-all-tpm-orig.mcx \
-    -write-tab ${expt}-all-tpm.tab
-
-    # make network with filtered gene set, all edges
-    mcxarray -data ${expt}-all-tpm-filtered-by-zeros.tsv -co 0 \
-    $params.skip_rows $params.skip_cols \
-    $params.cor_measure $params.labels \
-    --write-binary -o ${expt}-all-tpm-orig.mcx \
-    -write-tab ${expt}-all-tpm.tab
+    --write-binary -o ${expt}-tpm-orig.mcx \
+    -write-tab ${expt}-tpm.tab
 
     # make histogram of correlation values
-    mcx query -imx ${expt}-all-tpm-orig.mcx \
+    mcx query -imx ${expt}-tpm-orig.mcx \
     -values-hist -1/1/20 \
-    -o ${expt}-all-tpm-orig.cor-hist.txt
+    -o ${expt}-tpm-orig.cor-hist.txt
+
+    # make network with filtered gene set, all edges
+    mcxarray -data ${expt}-tpm-filtered-by-zeros.tsv -co 0 \
+    $params.skip_rows $params.skip_cols \
+    $params.cor_measure $params.labels \
+    --write-binary -o ${expt}-tpm-filtered-orig.mcx \
+    -write-tab ${expt}-tpm-filtered.tab
+
+    # make histogram of correlation values
+    mcx query -imx ${expt}-tpm-filtered-orig.mcx \
+    -values-hist -1/1/20 \
+    -o ${expt}-tpm-filtered-orig.cor-hist.txt
 
     # Also make one filtered with abs(), gt > 0.2
-    mcx alter -imx ${expt}-all-tpm-orig.mcx \
+    mcx alter -imx ${expt}-tpm-filtered-orig.mcx \
     -tf "abs(), gt(0.2)" \
-    --write-binary -o ${expt}-all-tpm-t20.mcx
+    --write-binary -o ${expt}-tpm-filtered-t20.mcx
     """
 
     stub:
     """
-    mkdir -p ${expt}
-    touch ${expt}-all-tpm.tsv ${expt}-all-tpm.tab \
-    ${expt}-all-tpm-orig.mcx ${expt}-all-tpm-t20.mcx \
-    ${expt}-all-tpm-orig.cor-hist.txt
+    touch ${expt}-samples.txt ${expt}-tpm.tsv ${expt}-tpm.tab \
+    ${expt}-tpm-orig.mcx ${expt}-tpm-orig.cor-hist.txt \
+    ${expt}-tpm-filtered-by-zeros.tsv ${expt}-tpm-filtered.tab \
+    ${expt}-tpm-filtered-orig.mcx ${expt}-tpm-filtered-t20.mcx \
+    ${expt}-tpm-filtered-orig.cor-hist.txt
     """
 }
 
-// Create a basic network with a correlation threshold of 0.2
 // Test varying threshold and knn parameters
 process TEST_PARAMETERS {
     label 'process_medium'
@@ -577,16 +586,16 @@ workflow {
     )
 
     // Test a range of filtering parameters
-    TEST_PARAMETERS(CREATE_BASE_NETWORK.out.filtered_network)
+    TEST_PARAMETERS(CREATE_BASE_NETWORK.out.filtered_t20_network)
 
-    // Filter networks by Correlation threshold or knn or both
+    // Filter networks by correlation threshold or knn or both
     if (params.threshold) {
         threshold_params_ch = channel.value(params.threshold)
-        FILTER_COR(CREATE_BASE_NETWORK.out.base_network, threshold_params_ch)
+        FILTER_COR(CREATE_BASE_NETWORK.out.filtered_network, threshold_params_ch)
     }
     if (params.knn) {
         knn_params_ch = channel.value(params.knn)
-        FILTER_KNN(CREATE_BASE_NETWORK.out.base_network, knn_params_ch)
+        FILTER_KNN(CREATE_BASE_NETWORK.out.filtered_network, knn_params_ch)
     }
 
     // If both cor and knn have been run, concat the two channels together
@@ -607,6 +616,7 @@ workflow {
     // Plot some graphs from the stats files
     // Collect together stats files
     cor_hist_ch = CREATE_BASE_NETWORK.out.cor_hist.collect()
+    filtered_cor_hist_ch = CREATE_BASE_NETWORK.out.filtered_cor_hist.collect()
     stats_ch = TEST_PARAMETERS.out.vary_threshold_stats.collect()
     FILTER_STATS(
         SUBSET_COUNTS.out.expts_file,
@@ -659,7 +669,7 @@ workflow {
         // join tab file to CLUSTER_NETWORK clustering output channel by expt name
         // Have to use the combine operator because the key (expt_name)
         // is not unique, because the networks are clustered with different inflation params
-        tab_ch = CREATE_BASE_NETWORK.out.tab_file
+        tab_ch = CREATE_BASE_NETWORK.out.filtered_tab_file
             .combine(CLUSTER_NETWORK.out.clustering, by: 0)
 
         // Run Guilt-by-Association on clustered networks
