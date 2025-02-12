@@ -267,6 +267,7 @@ process FILTER_STATS {
     path("expts.txt")   // list of expt names
     path(sample_file)   // samples file
     path("*")           // correlation histogram files
+    path("*")           // filtered correlation histogram files
     path("*")           // vary threshold stats files
     path("*")           // node stats after filtering
 
@@ -625,6 +626,7 @@ workflow {
         SUBSET_COUNTS.out.expts_file,
         file(params.samples),
         cor_hist_ch,
+        filtered_cor_hist_ch,
         stats_ch,
         filtered_stats_ch
     )

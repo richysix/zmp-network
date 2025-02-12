@@ -35,19 +35,6 @@ if (!dir.exists(plot_dir)) {
   dir.create(plot_dir)
 }
 
-# function to load the correlation histogram data
-load_cor_hist <- function(expt_name) {
-  filename <- file.path(paste(expt_name, "all-tpm-orig.cor-hist.txt", sep = "-"))
-  read_tsv(
-    filename, show_col_types = FALSE,
-    col_names = c("bin_end", "count")
-  ) |> 
-    mutate(
-      bin_start = bin_end - 0.1,
-      expt = expt_name
-    )
-}
-
 # find all expt names
 expts <- read_tsv("expts.txt", show_col_types = FALSE, col_names = c("expt"))
 # load all samples and count samples per expt
@@ -70,27 +57,68 @@ colour_palette <- biovisr::cbf_palette(sample_counts$expt,
 
 # set levels of expt
 expts$expt <- factor(expts$expt, levels = levels(sample_counts$expt))
-cor_hist_data <- map(expts$expt, load_cor_hist) |> 
+
+# function to load the correlation histogram data
+load_cor_hist <- function(expt_name, filename) {
+  read_tsv(
+    filename, show_col_types = FALSE,
+    col_names = c("bin_end", "count")
+  ) |> 
+    mutate(
+      bin_start = bin_end - 0.1,
+      expt = expt_name
+    )
+}
+
+# load data
+cor_hist_data <- 
+  map(expts$expt,
+      function(x) {
+        filename <- file.path(paste(x, "tpm-orig.cor-hist.txt", sep = "-"))
+        load_cor_hist(x, filename)
+      }) |>
   list_rbind() |> 
   mutate(expt = fct_relevel(expt, levels(sample_counts$expt))) |> 
   inner_join(sample_counts, by = "expt")
 
-max_val <- max(cor_hist_data$count) |> log10() |> ceiling()
-all_cor_col <- cor_hist_data |> 
-  mutate(count = count + 1) |> 
-  ggplot(aes(x = bin_end, y = count)) +
-  geom_col(aes(fill = sample_n_bin), position = position_nudge(x = -0.05)) +
-  scale_y_log10(
-    breaks = 10^(seq_len(max_val)),
-    labels = scales::label_log()
+plot_cor_hist <- function(cor_hist_data, bin_labels) {
+  max_val <- max(cor_hist_data$count) |> log10() |> ceiling()
+  all_cor_col <- cor_hist_data |> 
+    mutate(count = count + 1) |> 
+    ggplot(aes(x = bin_end, y = count)) +
+    geom_col(aes(fill = sample_n_bin), position = position_nudge(x = -0.05)) +
+    scale_y_log10(
+      breaks = 10^(seq_len(max_val)),
+      labels = scales::label_log()
     ) +
-  scale_fill_manual(values = biovisr::cbf_palette(bin_labels, named = TRUE)) +
-  facet_wrap(vars(expt)) +
-  labs(x = "Spearman Correlation") +
-  theme_minimal()
+    scale_fill_manual(values = biovisr::cbf_palette(bin_labels, named = TRUE)) +
+    facet_wrap(vars(expt)) +
+    labs(x = "Spearman Correlation") +
+    theme_minimal()
+  return(all_cor_col)
+}
 
+all_cor_col <- plot_cor_hist(cor_hist_data, bin_labels)
 miscr::output_plot(
-  list(plot = all_cor_col, filename = file.path(plot_dir, "all-cor-dist.pdf")),
+  list(plot = all_cor_col, filename = file.path(plot_dir, "orig-cor-dist.pdf")),
+  width = 12, 
+  height = 8
+)
+
+# plot histogram for filtered data
+cor_hist_data <- 
+  map(expts$expt,
+      function(x) {
+        filename <- file.path(paste(x, "tpm-filtered-orig.cor-hist.txt", sep = "-"))
+        load_cor_hist(x, filename)
+      }) |>
+  list_rbind() |> 
+  mutate(expt = fct_relevel(expt, levels(sample_counts$expt))) |> 
+  inner_join(sample_counts, by = "expt")
+
+all_cor_col <- plot_cor_hist(cor_hist_data, bin_labels)
+miscr::output_plot(
+  list(plot = all_cor_col, filename = file.path(plot_dir, "filtered-cor-dist.pdf")),
   width = 12, 
   height = 8
 )
@@ -196,30 +224,30 @@ all_components_plot <- function(stats_df, method) {
   )
 }
 
-cor_stats <- map(expts$expt, \(x) load_stats(x, "all-tpm.vary-cor-stats.tsv")) |>
+cor_stats <- map(expts$expt, \(x) load_stats(x, "tpm-filtered-t20.vary-cor-stats.tsv")) |>
   list_rbind() |>
   mutate(Expt = fct_relevel(Expt, levels(sample_counts$expt)))
 node_stats_plots(cor_stats, "cor")
 
 # KNN stats
 knn_stats <- map(expts$expt,
-                 \(x) load_stats(x, "all-tpm.vary-knn-stats.tsv")) |> 
+                 \(x) load_stats(x, "tpm-filtered-t20.vary-knn-stats.tsv")) |> 
   list_rbind() |> 
   rename(Cutoff = kNN)
 node_stats_plots(knn_stats, "knn")
 
 load_node_degrees <- function(filename) {
-  method <- ifelse(grepl("all-tpm-t[0-9]+-k[0-9]+", filename), "knn", "cor")
+  method <- ifelse(grepl("tpm-filtered-t[0-9]+-k[0-9]+", filename), "knn", "cor")
   if (method == "knn") {
-    threshold <- str_remove(filename, "^.*all-tpm-t[0-9]+-k") |>
+    threshold <- str_remove(filename, "^.*tpm-filtered-t[0-9]+-k") |>
       str_remove("\\.stats\\.tsv") |>
       as.integer()
   } else {
-    threshold <- str_remove(filename, "^.*all-tpm-t") |>
+    threshold <- str_remove(filename, "^.*tpm-filtered-t") |>
       str_remove("\\.stats\\.tsv") |>
       as.integer()
   }
-  expt <- str_remove(filename, "-all-tpm.*$")
+  expt <- str_remove(filename, "-tpm.*$")
   read_tsv(filename, show_col_types = FALSE) |> 
     mutate(
       Expt = expt,
