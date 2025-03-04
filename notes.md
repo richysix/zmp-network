@@ -898,3 +898,67 @@ ENSDARG00000085166 (17080, cl52) - ENSDARG00000095139 (20646, cl52)
 ```
 
 Wrote script spurious_cor.R to investigate over all expts
+Problem is caused by genes with very few non-zero count values leading to
+random, incorrectly high correlations.
+Updated counts-to-fpkm-tpm.R to filter genes based on the number of zero values.
+
+Rerun pipeline and check networks again
+Recopy data and sample info from sharepoint
+```
+module load rclone
+
+rclone copy --progress --max-depth 1 --filter "+ all.csv.gz" --filter "- *" \
+sharepoint-qmul-buschlab:detct/grcz11/everything/filter-strict/ ./
+
+rclone copy --verbose --filter "+ samples.txt" --filter "- *" \
+sharepoint-qmul-buschlab:detct/grcz11/everything/ ./
+
+rclone copy --verbose --filter "+ expt2samples.txt" --filter "- *" \
+sharepoint-qmul-buschlab:detct/grcz11/local_effect/ ./
+```
+
+Create expt/sample/condition file and subset to zmp_ph46/71/204/213/192/238/250
+```
+join -t$'\t' -1 2 <( sort -t$'\t' -k2,2 expt2samples.txt ) \
+<( sort -t$'\t' -k1,1 samples.txt ) | \
+awk -F"\t" 'BEGIN{ OFS = "\t" } { print $2, $1, $4 }' | sort -u | \
+cat <( echo -e "expt\tsample\tcondition" ) - > expt-sample-condition.tsv
+
+grep -E "^expt|zmp_ph(192|238|250|46|71|204|213)\b" \
+expt-sample-condition.tsv > expt-sample-condition-tfap2-plus.tsv
+```
+
+Rerun nextflow pipeline
+```
+rm -r test-nf/ test-anno-nf test-module
+cd nf
+rm -r work/ results.bak/
+mv results results.bak
+baseDir=/data/scratch/bty114/zmp-network
+
+qsub -m bea -M bty114@qmul.ac.uk \
+~/checkouts/uge-job-scripts/run-nextflow.sh \
+-o "-profile apptainer,apocrita" \
+-p "--ref_dir reference --samples $baseDir/expt-sample-condition-tfap2-plus.tsv --all_counts $baseDir/all.csv.gz" \
+~/checkouts/zmp-network/main.nf
+```
+
+ZFA file
+Copy from tmp file
+```
+cp /data/SBBS-BuschLab/tmp/ens-98-zfa.tsv $baseDir/
+awk -F"\t" '{ if ($4 != "-"){ {split($4, terms, ","); for (i in terms){ print $2 "\t" terms[i] "\tZFA" } } } }' \
+$baseDir/ens-98-zfa.tsv > $baseDir/nf/reference/Dr-e98-Gene2ZFA.txt
+# archive ens-98-zfa.tsv to sharepoint
+```
+
+Discovered an error in run-GBA-network.R due to subsetting returning a vector not a matrix
+Resume pipeline
+```
+qsub -m bea -M bty114@qmul.ac.uk \
+~/checkouts/uge-job-scripts/run-nextflow.sh \
+-o "-profile apptainer,apocrita" \
+-p "--ref_dir reference --samples $baseDir/expt-sample-condition-tfap2-plus.tsv --all_counts $baseDir/all.csv.gz" \
+-r current \
+~/checkouts/zmp-network/main.nf
+```
