@@ -191,12 +191,15 @@ calculate_cor_values_vs_all_genes <- function(
 
 # function to check where to pick the zeros threshold
 filter_by_zeros <- function(tpm_df, samples, cor_count_threshold = 50, write_func) {
+  # create transposed matrix
   t_tpm <- tpm_df |>
     dplyr::select(-c(GeneID, Name)) |>
     t()
+  # remove genes where all samples are zero
   tpm_no_all_zeros <- tpm_df |>
     dplyr::mutate(num_zeros = apply(t_tpm, 2, \(x) (x == 0) |> sum())) |>
     dplyr::filter(num_zeros != nrow(samples))
+  # split genes by how samples are zero
   tpm_by_zeros <- split(tpm_no_all_zeros, tpm_no_all_zeros$num_zeros)
   num_genes <-   tpm_by_zeros |>
     purrr::imap(\(x, idx) { tibble(
@@ -207,8 +210,11 @@ filter_by_zeros <- function(tpm_df, samples, cor_count_threshold = 50, write_fun
     purrr::list_rbind() |> 
     dplyr::mutate(cumul_genes = cumsum(num_genes))
   
+  # start at genes with largest numbers of zeros
   rev_num_zeros <- names(tpm_by_zeros) |> as.integer() |>
     sort(decreasing = TRUE) |> as.character()
+  # loop through until number of correlations > 0.9 is below the threshold
+  # therefore look at the minimum number of genes
   for (num_zeros in rev_num_zeros) {
     cor_gt_0.9 <- calculate_cor_values_vs_all_genes(
       tpm_by_zeros[[num_zeros]], tpm_no_all_zeros, samples, num_zeros, write_func
@@ -219,10 +225,16 @@ filter_by_zeros <- function(tpm_df, samples, cor_count_threshold = 50, write_fun
     }
   }
   
+  # get number of samples with zeros to filter by
   above_threshold <- num_genes$num_zeros[
     !is.na(num_genes$`cor_gt_0.9`) & num_genes$`cor_gt_0.9` >= cor_count_threshold
   ]
-  return(dplyr::filter(tpm_no_all_zeros, !(num_zeros %in% above_threshold)))
+  # return tpm filtered by zeros
+  tpm_filtered <- dplyr::filter(tpm_no_all_zeros, !(num_zeros %in% above_threshold))
+  return(list(
+    no_all_zeros = tpm_no_all_zeros, 
+    filtered = tpm_filtered
+  ))
 }
 
 # output fpkm and tpm
@@ -244,27 +256,29 @@ if (cmd_line_args$options$tpm) {
 
 # filter tpms if filter_threshold set
 if (!is.null(cmd_line_args$options$filter_threshold)) {
-  cor_by_num_zeros_out_file <- paste0(cmd_line_args$options$output_base, 
-                                  "-cor-by-num-zeros.",
-                                  cmd_line_args$options$output_format)
-  tpm_filtered <- filter_by_zeros(
+  tpm_filtered_list <- filter_by_zeros(
       tpm,
       samples, 
       cor_count_threshold = cmd_line_args$options$filter_threshold,
       write_func
     )
+  # tpm no all zeros file
+  tpm_filtered_out_file <- paste0(cmd_line_args$options$output_base, 
+                                  "-tpm-filtered-no-all-zeros.",
+                                  cmd_line_args$options$output_format)
+  write_func(tpm_filtered_list$no_all_zeros, file = tpm_filtered_out_file)
+  
   tpm_filtered_out_file <- paste0(cmd_line_args$options$output_base, 
                                   "-tpm-filtered-by-zeros.",
                                   cmd_line_args$options$output_format)
-  
-  write_func(tpm_filtered, file = tpm_filtered_out_file)
+  write_func(tpm_filtered_list$filtered, file = tpm_filtered_out_file)
 }
 
-# output counts as well
-counts_out_file <- paste0(cmd_line_args$options$output_base, "-counts.",
-                          cmd_line_args$options$output_format)
-rnaseq_data |> dplyr::select(-any_of(pval_cols)) |> 
-  write_func(file = counts_out_file)
+# # output counts as well
+# counts_out_file <- paste0(cmd_line_args$options$output_base, "-counts.",
+#                           cmd_line_args$options$output_format)
+# rnaseq_data |> dplyr::select(-any_of(pval_cols)) |> 
+#   write_func(file = counts_out_file)
 
 # AUTHOR
 #
