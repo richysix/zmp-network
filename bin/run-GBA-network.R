@@ -89,11 +89,37 @@ gene_id2term_id <- annotation |>
   dplyr::select(GeneID, TermID) |> 
   as.matrix()
 annotations <- make_annotations(gene_id2term_id, nodes$gene_id, annotation$TermID)
-annotations <- filter_network_cols(
+
+# make a new version of the EGAD filter_network_cols function to does subsetting properly
+filter_network_cols_override <- function (network, min = 0, max = 1, ids = NA) {
+  network <- as.matrix(network)
+  if (sum(is.na(ids))) {
+    colsums <- colSums(network)
+    col.filter <- which((colsums > min & colsums < max))
+  }
+  else {
+    m = match(colnames(network), ids)
+    col.filter = !is.na(m)
+  }
+  network <- network[, col.filter, drop = FALSE]
+  return(network)
+}
+
+annotations <- filter_network_cols_override(
   annotations,
   min = cmd_line_args$options$min.term.size,
   max = cmd_line_args$options$max.term.size
 )
+# check if any columns are left after filtering annotations
+if (ncol(annotations) == 0) {
+  message("The graph has no nodes that are annotated to annotation terms. Skipping GBA analysis")
+  glue::glue("TermID", "auc", "avg_node_degree", "degree_null_auc", .sep = "\t") |>
+    writeLines(con = cmd_line_args$options$auc_file, sep = "\n")
+  glue::glue("TermID", "auc", "avg_node_degree", "degree_null_auc", .sep = "\t") |>
+    writeLines(con = cmd_line_args$options$scores_file, sep = "\n")
+  file.create(cmd_line_args$options$plots_file)
+  quit(save = "no", status = 0)
+}
 
 # run GBA
 Anno_groups_voted <- run_GBA(
@@ -114,11 +140,15 @@ optimallist_GO <-  Anno_genes_multifunc_assessment[,4]
 auc_gene_mf <- auc_multifunc(t(annotations), optimallist_GO)
 
 # Output results
-as_tibble(Anno_groups_voted[[1]], rownames = "TermID") |>
+Anno_groups_voted[[1]] |> 
+  magrittr::set_rownames(colnames(annotations)) |>
+  as_tibble(rownames = "TermID") |>
   arrange(desc(auc)) |>
   write_tsv(file = cmd_line_args$options$auc_file)
 
-as_tibble(Anno_groups_voted[[2]], rownames = "GeneID") |>
+Anno_groups_voted[[2]] |> 
+  magrittr::set_colnames(colnames(annotations)) |>
+  as_tibble(rownames = "GeneID") |>
   arrange(GeneID) |>
   write_tsv(cmd_line_args$options$scores_file)
 
@@ -144,11 +174,14 @@ plot_distribution(auc_Anno_mf, xlab = "Optimal GO Ranking AUROC",
                   density = FALSE, avg = FALSE, bars = TRUE) |> 
   invisible()
 
-plot_distribution(auc_gene_mf, xlab = "Optimal Gene Ranking AUROC",
-                  ylab = "Number of functional terms",
-                  b = 20, xlim = c(0.2,1), ylim = c(0,4400), col = "gray64", 
-                  density = FALSE, avg = FALSE, bars = TRUE) |> 
-  invisible()
+tryCatch(
+  plot_distribution(auc_gene_mf, xlab = "Optimal Gene Ranking AUROC",
+                    ylab = "Number of functional terms",
+                    b = 20, xlim = c(0.2,1), ylim = c(0,4400), col = "gray64", 
+                    density = FALSE, avg = FALSE, bars = TRUE) |> 
+    invisible(), 
+  error = function(e) e
+)
 
 dev.off() |> 
   invisible()
