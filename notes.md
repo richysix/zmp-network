@@ -871,61 +871,30 @@ Running with debugging
 nextflow run -profile apptainer,local,test --ref_dir reference --debug 2 ~/checkouts/zmp-network/main.nf
 ```
 
+Find out how much space is taken up by the actual results
+```
+module load datamash
+find work/ -type f | xargs ls -l | awk '{print $9, $5}' | \
+sed -e 's|work.*/||' | grep zmp | sed -e 's|-all.* | |' | sort -k1,1 | \
+datamash -W -g 1 sum 2 | awk '{ print $1, $2/1024/1024/1024 "G"}'
+```
 
-du -sh results/ work/
-125G    results/
-1.6T    work/
-
-24G     results/zmp_ph192
-21G     results/zmp_ph250
-19G     results/zmp_ph238
-15G     results/zmp_ph46
-19G     results/zmp_ph213
-18G     results/zmp_ph204
-13G     results/zmp_ph71
-
-find work/ -type f | xargs ls -l | awk '{print $9, $5}' | sed -e 's|work.*/||' | grep zmp | sed -e 's|-all.* | |' | sort -k1,1 | datamash -W -g 1 sum 2 | awk '{ print $1, $2/1024/1024/1024 "G"}'
-
+Look through networks
 ### zmp_ph204
 
 There are 16 clusters that are not attached to the main component
 - **Cluster49** All the edges have value 1. e.g. ENSDARG00000002298 and ENSDARG00000008473
 - **Cluster50** All the edges have value 1. e.g. ENSDARG00000025672 and ENSDARG00000079163
 - **Cluster55** All the edges have value 1. e.g. ENSDARG00000082454 and ENSDARG00000092160
-
-ENSDARG00000071037
 - **Cluster68** All the edges have value 1. e.g. ENSDARG00000068858 and ENSDARG00000018687
 
-
+Get examples from graphml file
+```
 n710 (-) n24219
 ENSDARG00000113827 (33240, cl52) - ENSDARG00000095139 (20646, cl52)
 
 n12488 (-) n24219
 ENSDARG00000085166 (17080, cl52) - ENSDARG00000095139 (20646, cl52)
-
-grep -B2 -A6 ENSDARG00000000018 nf/results/zmp_ph204/zmp_ph204-all-tpm-t20-k80.mcx.I15.graphml 
-    <node id="n7458">
-      <data key="d1">2</data>
-      <data key="d2">ENSDARG00000000018</data>
-      <data key="d3">nrf1</data>
-      <data key="d4">nuclear respiratory factor 1 [Source:NCBI gene;Acc:64604]</data>
-      <data key="d5">0</data>
-      <data key="d6">False</data>
-      <data key="d7">#0073B3</data>
-    </node>
-grep -B2 -A6 ENSDARG00000000183 nf/results/zmp_ph204/zmp_ph204-all-tpm-t20-k80.mcx.I15.graphml 
-    <node id="n8520">
-      <data key="d1">12</data>
-      <data key="d2">ENSDARG00000000183</data>
-      <data key="d3">ptpn4b</data>
-      <data key="d4">protein tyrosine phosphatase non-receptor type 4b [Source:ZFIN;Acc:ZDB-GENE-030131-6259]</data>
-      <data key="d5">0</data>
-      <data key="d6">False</data>
-      <data key="d7">#0073B3</data>
-    </node>
-
-grep -A2 'source="n7458" target="n8520"' nf/results/zmp_ph204/zmp_ph204-all-tpm-t20-k80.mcx.I15.graphml 
-
-<edge id="e2959" source="n55" target="n7109">
+```
 
 Wrote script spurious_cor.R to investigate over all expts
