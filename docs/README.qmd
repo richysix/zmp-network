@@ -4,197 +4,173 @@ format: gfm
 editor: source
 ---
 
-![](schematic.excalidraw.svg)
+![](docs/schematic.excalidraw.svg)
 
 ## Processes
 
-### SUBSET (big_mem_retry)
+### LOG_INFO
+
+Prints out some information about input files and settings. Only run if the 
+debug param is greater than 0. Executed locally.
+
+### SUBSET_COUNTS
 
 Creates a sample and count file for each individual experiment with the counts
 aggregated to the gene level.
 
 Inputs:
 
-1. Experiment file: Tab-separated file, containing columns `expt` and `sample`
+1. Samples file: Tab-separated file, must contain columns `expt` and `sample`
 
 1. Counts file: Comma-separated file containing counts for all the samples (Can be gzipped)
 
 Outputs:
-Tuple of  
-1. File containing expt directory names
 
-1. Tuple of sample files
+1. expts_file: File containing expt directory names
 
-1. Tuple of count files
+1. sample_files: Tuple of sample files
 
-These are process to create Tuples containing and expt name, sample file and 
+1. count_files: Tuple of count files
+
+These are processed to create Tuples containing expt name, sample file and 
 count file for `CREATE_BASE_NETWORK`.
 
 Script:
-    Runs `scripts/subset-by-expt.py`
+    Runs `subset-by-expt.sh` which in turn runs `subset-by-expt.py`
 
-### CREATE_BASE_NETWORK (big_mem_retry)
+### CREATE_BASE_NETWORK
 
 Creates a base correlation network containing ALL edges and one with 
 edge weights converted to absolute values and edges with weights less than 
-0.2 descarded.
+0.2 discarded. It also removes genes that lead to spurious high correlations 
+due to large numbers of zeros values.
 
 Inputs:
 
-1. Expt name
+1. Tuple of expt name, sample file and count file
 
-1. sample file
-
-1. count file
+1. Path to the transcripts file (needed to convert counts to TPM)
 
 Outputs:
 
-1. Dir name: name of experiment.
+1. sample_files: Tuple of experiment name and samples file paths.
 
-1. TPM file: Tab-separated file of TPMs used to create the network.
+1. tpms_file: Tuple of experiment name and TPM file path.
 
-1. TAB file: File output by MCL mapping node ids to gene ids.
+1. tab_file: Tuple of experiment name and MCL file mapping node ids to gene ids.
 
-1. MCX file: MCL network (binary) file detailing all the edges in the network and their
-weights.
+1. base_network: Tuple of experiment name and MCL network (binary) file 
+detailing all the edges in the network and their weights.
 
-1. t20 MCX file: MCL network (binary) file with absolute edge weights.
-Edges with weights less than 0.2 have been removed.
+1. filtered_tpms_file: Tuple of experiment name and TPM file filtered by zeros
 
-1. MAT file: Gzipped file containing all edge weights in a matrix format.
+1. no_all_zeros_tpms_file: Tuple of experiment name and TPM file with genes 
+where all values are zero removed
 
-1. Cor hist file: contains counts of edges with correlation values in 0.1 width bins
+1. filtered_tab_file: Tuple of experiment name and MCL tab file for the TPM file 
+filtered by zeros
+
+1. filtered_network: Tuple of experiment name and MCL network (binary) file 
+creating from the filtered_tpms_file
+
+1. filtered_t20_network: Tuple of experiment name and MCL network (binary) file
+with absolute edge weights. Edges with weights less than 0.2 have been removed.
+
+1. cor_hist: path to file containing counts of edges with correlation values in
+0.1 width bins
+
+1. filtered_cor_hist: same as cor_hist for filtered network
 
 Script:
-    Runs `scripts/counts-to-fpkm-tpm.R` and then `mcxarray`, `mcxdump` and `cor-hist.py`
+    Runs `counts-to-fpkm-tpm.R` and then `mcxarray`, `mcx query` and `mcx alter`
 
-### TEST_PARAMETERS (med_mem_retry)
+### TEST_PARAMETERS
 
-Creates a basic network thresholded at 0.2 and then collects stats on node 
-degree and singletons when the threshold is varied. Also collects stats on
-using k-nearest neighbours.
+Collects stats on node degree and singletons when the correlation threshold is
+varied. Also collects stats on filtering using k-nearest neighbours.
+Uses the `filtered_t20_network` output channel from `CREATE_BASE_NETWORK` as input.
 
-Inputs:
+Inputs: 
 
-1. Dir name: name of experiment
-
-1. TPM file: Tab-separated file of TPMs used to create the network
+1. Tuple of expt name and MCX file path
 
 Outputs:
 
-1. Dir name: name of experiment
-
-1. MCI file: MCL network file detailing all the edges in the network and their
-weights.
-
-1. Cor stats file: File of node stats varying correlation threshold
-
-1. Knn stats file: File of node stats varying knn threshold
+1. vary_threshold_stats: Tuple of paths to the stats output files from `mcx query`
 
 Script:
-    Runs `mcxarray` and `mcx query`
+    Runs `mcx query`
 
-### FILTER_COR (retry)
+### FILTER_COR
 
-Using the threshold parameters to create pruned networks.
+Using the threshold parameters to create pruned networks. Uses the 
+`filtered_network` output channel from `CREATE_BASE_NETWORK` as input.
 
 Inputs:
 
-1. Dir name: name of experiment
-
-1. MCI file: MCL network file detailing all the edges in the network and their
-correlation values
+1. Tuple of expt name and MCX file path
 
 1. Threshold parameter
 
 Outputs:
 
-1. Dir name: name of experiment
+1. filtered_mcx: Tuple of expt name and path to filtered MCX file
 
-1. MCI file: MCL network files pruned using correlation threshold.
-
-1. Stats file
+1. node_stats: Stats file for filtered network
 
 Script:
     Runs `mcx alter` and `mcx query`
 
-### FILTER_KNN (retry)
+### FILTER_KNN
 
-Using the knn parameters to create pruned networks.
+Using the knn parameters to create pruned networks. Uses the 
+`filtered_network` output channel from `CREATE_BASE_NETWORK` as input.
 
 Inputs:
 
-1. Dir name: name of experiment
+1. Tuple of expt name and MCX file path
 
-1. MCI file: MCL network file detailing all the edges in the network and their
-correlation values
-
-1. knn parameter
+1. Threshold parameter
 
 Outputs:
 
-1. Dir name: name of experiment
+1. filtered_mcx: Tuple of expt name and path to filtered MCX file
 
-1. MCI file: MCL network files pruned using correlation threshold.
-
-1. Stats file
+1. node_stats: Stats file for filtered network
 
 Script:
     Runs `mcx alter` and `mcx query`
 
-### CLUSTER (retry)
+### CLUSTER_NETWORK
 
 Clusters the supplied network.
 
 Inputs:
 
-1. Tuple of 
-
-    1. Dir name: name of experiment
-
-    1. Threshold string
-
-    1. MCI file
+1. Tuple of expt name and MCX file path
 
 1. Inflation values: From `inflationParams` in the config. This is a list.
 The CLUSTER process is run once for each inflation value in the list.
 
 Outputs:  
 
-Tuple of  
+1. clustering: Tuple of expt name. MCX file and clustered MCX file
 
-1. Dir name: name of experiment
+1. cluster_sizes: File of cluster ids and sizes (i.e. number of nodes)
 
-1. MCI file
-
-1. Clustered MCI file
-
-1. Stats file: info on each node
-
-1. Tuple of summarise_clustering.py outputs (cluster sizes and histograms)
-
-The outputs are crossed with the output from CREATE_BASE_NETWORK and rearranged 
-so that the original tab file is available for the next process (GBA)
+1. stats: Stats file and info file
 
 Script:
-Runs `mcl`, `clm info` and `scripts/summarise_clustering.py`
+Runs `mcl`, `clm info` and `summarise_clustering.py`
 
-### GBA (huge_mem_retry)
+### RUN_GUILT_BY_ASSOCIATION
 
 Converts the clustered MCI file to nodes and edges files. Then runs GBA on
 the network.
 
 Inputs:
 
-1. Tuple of:
-
-    1. Dir name: name of experiment
-
-    1. TAB file
-
-    1. MCI file
-
-    1. Clustered MCI file
+1. Tuple of expt name, tab file, MCX file, Cluster file
 
 1. Annotation file: Tab-separated file of Gene annotation (Chr, Start End, ID, Name etc.)
 
@@ -204,58 +180,110 @@ Inputs:
 
 Outputs:
 
-Tuple of  
+1. graph_files: Tuple of cluster file, graphml files, nodes file and edges file
 
-1. Dir name: name of experiment
+    1. MCX Cluster file
 
-1. Clustered MCI file
+    1. Graphml file: For importing into Cytoscape etc.
 
-1. Graphml file: For importing into Cytoscape etc.
+    1. Nodes file: Comma-separated file of node information with Name and Cluster id
 
-1. Nodes file: Comma-separated file of node information with Name and Cluster id
+    1. Edges files: Comma-separated file of edge information with source, target and weight
 
-1. Edges files: Comma-separated file of edge information with source, target and weight
+1. auc_files: Files with AUC values for each term from GO and ZFA ontologies
 
-1. AUC file: Output file from GBA with AUC values for each GO term
+1. gba_out: Tuple of 
 
-1. Gene scores file: Output file from GBA with gene scores for each GO term
+    1. GBA output: Output file from GBA with gene scores for each GO term
 
-1. Plots file: Histograms of AUC values
+    1. Plots file: Histograms of AUC values
 
 Script:
-Runs `scripts/mcl2nodes-edges.py` and `scripts/run-GBA-network.R`
+Runs ` mcx convert`, `convert_mcl.py` and `run-GBA-network.R`
 
-### ENRICHMENT (retry)
+### RUN_POST_GBA_STATS
+
+Analyses the effect of different thresholds and clustering parameters on the 
+quality of the network/clusters
+
+Inputs:
+
+1. Expts file: The `expts_file` output channel from `SUBSET_COUNTS`
+
+1. Samples file: Tab-separated file, must contain columns `expt` and `sample`
+
+1. auc_files: Files with AUC values for each term from GO and ZFA ontologies
+`auc_files_ch` output channel from `RUN_GUILT_BY_ASSOCIATION`
+
+1. cluster_sizes: Cluster sizes files. `cluster_sizes` output channel from 
+`CLUSTER_NETWORK`
+ 
+Outputs:
+
+1. plots: paths to output plots
+
+1. tsv: Tab-separated output files. Contain values for the ecdf 
+(empirical cumulative density function) cluster sizes
+
+1. html: html output showing % of nodes in each network of sizes between 100 and 1000
+
+### ENRICHMENT
 
 Runs topGO enrichment on the individual clusters in the network
 
 Inputs:
 
-1. Tuple of
-
-    1. Dir name
+1. `graph_files` output channel from `RUN_GUILT_BY_ASSOCIATION`. Tuple of
 
     1. Clustered MCI file
 
+    1. Graphml  file
+    
     1. Nodes file
+    
+    1. Edge file
 
-1. GO annotation file
-
-    output:
-    tuple val(dir), path(nodes_file), path("*/GO/*")
+1. GO annotation file. `go_anno_file` output channel from `GET_ANNO_GET_GO_ANNO`
 
 Outputs:
 
-Tuple of  
+1. go_output: Tuple of  
 
-1. Dir name
+    1. Cluster File
 
-1. Nodes file
-
-1. Tuple of GO enrichment files
+    1. topGO output directory
 
 Script:
 Runs `create_files_for_topgo.py` and `run_topgo.pl`
+
+### PUBLISH_NETWORKS
+
+Takes all of the output files and runs a python script to pick the best 
+clustering for that experiment and publish just those files.
+
+Inputs:
+
+1. Expts: Tuple of
+
+    1. Expt name
+    
+    1. Filter method (cor or knn)
+    
+1. ecdf tsv files: `tsv` output channel from RUN_POST_GBA_STATS
+
+1. MCX files: `filtered_network_ch`
+
+1. Stats files: network stats files
+
+1. Graph files: graphs and GO output
+
+1. AUC files:
+
+1. GBA output files
+
+Outputs:
+
+1. pub_files: The files to publish. Organised into one directory for each experiment
 
 ## Process DAG
 
