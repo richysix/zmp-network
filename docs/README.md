@@ -1,6 +1,10 @@
 # ZMP Network
 
 
+A [nextflow](https://nextflow.io/) pipeline to create expression
+correlation networks from a large catalogue of RNA-seq experiments and
+to combine the individual networks into one aggregate network.
+
 ![](docs/schematic.excalidraw.svg)
 
 ## Processes
