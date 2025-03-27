@@ -90,7 +90,7 @@ gene_id2term_id <- annotation |>
   as.matrix()
 annotations <- make_annotations(gene_id2term_id, nodes$gene_id, annotation$TermID)
 
-# make a new version of the EGAD filter_network_cols function to does subsetting properly
+# make a new version of the EGAD filter_network_cols function that does subsetting properly
 filter_network_cols_override <- function (network, min = 0, max = 1, ids = NA) {
   network <- as.matrix(network)
   if (sum(is.na(ids))) {
