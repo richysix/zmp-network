@@ -962,3 +962,36 @@ qsub -m bea -M bty114@qmul.ac.uk \
 -r current \
 ~/checkouts/zmp-network/main.nf
 ```
+
+Test dumping matrix
+```
+qlogin -l h_vmem=16G
+module load MCL/14-137
+cd /data/scratch/bty114/zmp-network/nf/work/39/b9024100ffb71903bbfe639f900cc0
+mcx_file=zmp_ph46-tpm-filtered-orig.mcx
+mcx_base=$( basename $mcx_file .mcx )
+mcxdump --dump-pairs -imx $mcx_file -o $mcx_base.pairs
+
+mcxdump --dump-table -imx $mcx_file -o $mcx_base.mat
+
+```
+
+--------------------------------------------------------------------------------
+Update README
+
+Run pipeline in preview mode to get current DAG
+```
+qlogin
+nextflow run -profile apptainer,apocrita \
+--ref_dir reference --samples $baseDir/expt-sample-condition-tfap2-plus.tsv \
+--all_counts $baseDir/all.csv.gz -preview ~/checkouts/zmp-network/main.nf
+```
+
+Pipeline DAG is in results/pipeline_info/pipeline_dag_2025-03-27_11-33-13.mmd
+```
+export gitdir=$HOME/checkouts/zmp-network
+timestamp="2025-03-27_11-33-13"
+cat <( echo "\`\`\`mermaid" ) \
+results/pipeline_info/pipeline_dag_${timestamp}.mmd \
+<( echo "\`\`\`" ) > $gitdir/docs/_dag-current.md
+```
