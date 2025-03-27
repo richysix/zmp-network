@@ -81,6 +81,8 @@ process CREATE_BASE_NETWORK {
     label 'process_medium'
     publishDir path: "${params.outdir}/${expt}", mode: params.publish_dir_mode,
         pattern: "${expt}-tpm*{-orig.mcx,-orig.cor-hist.txt,.tsv,.tab,}"
+    publishDir path: "${params.outdir}/${expt}", mode: params.publish_dir_mode,
+        pattern: "${expt}-samples.t*"
 
 
     input: 
@@ -88,10 +90,13 @@ process CREATE_BASE_NETWORK {
     path(transcript_file)
 
     output:
+    tuple val(expt), path("${expt}-samples.tsv"),
+        path("${expt}-samples.txt"),                                emit: sample_files
     tuple val(expt), path("${expt}-tpm.tsv"),                       emit: tpms_file
     tuple val(expt), path("${expt}-tpm.tab"),                       emit: tab_file // mapping of node ids to Ensembl gene ids
     tuple val(expt), path("${expt}-tpm-orig.mcx"),                  emit: base_network
     tuple val(expt), path("${expt}-tpm-filtered-by-zeros.tsv"),     emit: filtered_tpms_file
+    tuple val(expt), path("${expt}-tpm-filtered-no-all-zeros.tsv"), emit: no_all_zeros_tpms_file
     tuple val(expt), path("${expt}-tpm-filtered.tab"),              emit: filtered_tab_file // mapping of node ids to Ensembl gene ids
     tuple val(expt), path("${expt}-tpm-filtered-orig.mcx"),         emit: filtered_network
     tuple val(expt), path("${expt}-tpm-filtered-t20.mcx"),          emit: filtered_t20_network
@@ -102,6 +107,7 @@ process CREATE_BASE_NETWORK {
     """
     awk -F"\\t" '{if(NR > 1){ print \$2 "\\t" \$3 }}' \
         ${sample_file} > ${expt}-samples.txt
+    mv ${sample_file} > ${expt}-samples.tsv
 
     module load R/${params.r_version}
     counts-to-fpkm-tpm.R \
@@ -353,9 +359,9 @@ process RUN_GUILT_BY_ASSOCIATION {
         path("${cluster_file}.graphml"),
         path("${cluster_file}.nodes.tsv"),
         path("${cluster_file}.edges.tsv"),              emit: graph_files
-    path("${cluster_file}.{go,zfa}.auc.tsv"),                    emit: auc_files
+    path("${cluster_file}.{go,zfa}.auc.tsv"),           emit: auc_files
     tuple path("${cluster_file}.*.gene-scores.tsv"), 
-        path("${cluster_file}.*.GBA-plots.pdf"),          emit: gba_out
+        path("${cluster_file}.*.GBA-plots.pdf"),        emit: gba_out
 
     script:
     matches = (mcx_file =~ /tpm-filtered-(t?)(\d*)-?(k?)(\d*).mcx$/)
