@@ -144,6 +144,8 @@ tpm <- inner_join(
   as_tibble(tpm, rownames = "GeneID"),
   by = join_by(GeneID == GeneID)
 )
+colnames(tpm)[ colnames(tpm) %in% samples$sample ] <- 
+  sub("$", " tpm", colnames(tpm)[ colnames(tpm) %in% samples$sample ])
 
 # function to calculate the correlation coefficient for a subset of genes
 # compared to all genes and return the number > 0.9
