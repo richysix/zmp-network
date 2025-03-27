@@ -192,7 +192,7 @@ node_stats_plots <- function(stats_df, method) {
          filename = paste0(filename_base, "-stats-node-degrees-close-up.pdf")),
     width = 9.6,
   )
-  all_components_plot(cor_stats, method)
+  all_components_plot(stats_df, method)
 }
 
 all_components_plot <- function(stats_df, method) {
@@ -212,8 +212,11 @@ all_components_plot <- function(stats_df, method) {
     facet_wrap(vars(category), nrow = 1, scales = "free_y",
                labeller = labeller(category = categories)) +
     scale_colour_manual(values = colour_palette) +
-    scale_x_reverse() +
     theme_minimal()
+  if (method == "knn") {
+    all_components <- all_components +
+      scale_x_reverse()
+  }
   
   filename_base <- file.path(plot_dir, method)
   miscr::output_plot(
