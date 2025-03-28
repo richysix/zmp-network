@@ -898,8 +898,39 @@ ENSDARG00000085166 (17080, cl52) - ENSDARG00000095139 (20646, cl52)
 ```
 
 Wrote script spurious_cor.R to investigate over all expts
+
+```
+echo "Rscript ~/checkouts/zmp-network/scripts/spurious_cor.R \
+zmp_ph46 zmp_ph71 zmp_ph192 zmp_ph204 zmp_ph213 zmp_ph238 zmp_ph250" > run-spurious-cor.txt
+
+qsub -t 1 -l h_vmem=12G \
+~/checkouts/uge-job-scripts/rscript-array.sh \
+run-spurious-cor.txt run-spurious-cor
+```
+Expt zmp_ph204: 1705 genes are zero across all samples 
+Expt zmp_ph204: 16359 genes have zeros in fewer then 1/4 of samples
+
+Expt zmp_ph192: 1365 genes are zero across all samples 
+Expt zmp_ph192: 12982 genes have zeros in fewer then 1/4 of samples
+
+Expt zmp_ph213: 1586 genes are zero across all samples 
+Expt zmp_ph213: 16420 genes have zeros in fewer then 1/4 of samples
+
+Expt zmp_ph238: 906 genes are zero across all samples 
+Expt zmp_ph238: 14693 genes have zeros in fewer then 1/4 of samples
+
+Expt zmp_ph250: 784 genes are zero across all samples 
+Expt zmp_ph250: 15300 genes have zeros in fewer then 1/4 of samples
+
+Expt zmp_ph46: 731 genes are zero across all samples 
+Expt zmp_ph46: 19335 genes have zeros in fewer then 1/4 of samples
+
+Expt zmp_ph71: 1540 genes are zero across all samples 
+Expt zmp_ph71: 16656 genes have zeros in fewer then 1/4 of samples
+
 Problem is caused by genes with very few non-zero count values leading to
 random, incorrectly high correlations.
+
 Updated counts-to-fpkm-tpm.R to filter genes based on the number of zero values.
 
 Rerun pipeline and check networks again
@@ -973,8 +1004,22 @@ mcx_base=$( basename $mcx_file .mcx )
 mcxdump --dump-pairs -imx $mcx_file -o $mcx_base.pairs
 
 mcxdump --dump-table -imx $mcx_file -o $mcx_base.mat
-
 ```
+
+Add " tpm" to header of tpm files so that they work in NetworkViewer
+```
+for expt in zmp_ph46 zmp_ph71 zmp_ph192 zmp_ph204 zmp_ph213 zmp_ph238 zmp_ph250
+do
+  sed -i -E 's|(zmp_[a-zA-Z0-9_]+)|\1 tpm|g' nf/results/${expt}/${expt}-all-tpm.tsv
+done
+```
+Update counts-to-fpkm-tpm.R to add " tpm" when outputting data
+
+Plot effect of threshold for filtering genes with zeros
+```
+Rscript ~/checkouts/zmp-network/scripts/spurious-cor-threshold.R
+```
+Creates plots/filtering-spurious-correlations.svg
 
 --------------------------------------------------------------------------------
 Update README
