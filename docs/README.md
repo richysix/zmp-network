@@ -145,6 +145,26 @@ Outputs:
 
 Script: Runs `mcx alter` and `mcx query`
 
+### FILTER_STATS
+
+Produces plots based on the filtering data
+
+Inputs:
+
+1.  Path for experiment names file
+1.  Samples file: Tab-separated file, must contain columns `expt` and
+    `sample`
+1.  correlation histogram files produced by CREATE_BASE_NETWORK
+1.  filtered correlation histogram files produced by CREATE_BASE_NETWORK
+1.  Stats on vary the correlation threshold from TEST_PARAMETERS
+1.  Stats from filtering from FILTER_COR/FILTER_KNN
+
+Outputs:
+
+1.  Directory of plot files
+
+Script: Runs edge-filtering-analysis.R script
+
 ### CLUSTER_NETWORK
 
 Clusters the supplied network.
@@ -241,7 +261,7 @@ Outputs:
 3.  html: html output showing % of nodes in each network of sizes
     between 100 and 1000
 
-### ENRICHMENT
+### RUN_GO_ENRICHMENT
 
 Runs topGO enrichment on the individual clusters in the network
 
@@ -414,3 +434,11 @@ flowchart TB
     v55 --> v57
     v57 --> v58
 ```
+
+## Running the pipeline
+
+To run the pipeline you need 
+[nextflow](https://www.nextflow.io/docs/latest/install.html) installed.
+
+Config files to set parameters for the pipeline are in nextflow.config and 
+files in the config directory.

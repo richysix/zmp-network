@@ -1057,3 +1057,49 @@ Run as job array
 qsub -l h_rt=120:0:0 -l h_vmem=128G -l highmem -t 1-2 ~/checkouts/uge-job-scripts/python-array.sh python-array.txt
 qsub -l h_rt=120:0:0 -l h_vmem=128G -l highmem -t 3-10 ~/checkouts/uge-job-scripts/python-array.sh python-array.txt
 ```
+
+## Running the pipeline on Apocrita
+
+To run the pipeline you need nextflow installed
+
+```
+curl -s https://get.nextflow.io | bash
+chmod +x nextflow
+# copy to ~/bin dir with new name
+mv nextflow ~/bin/nextflow-exe
+```
+
+Create a wrapper script to load the java module and then run nextflow,
+passing in any arguments
+```
+echo '#!/usr/bin/env bash
+
+module load openjdk/17.0.8.1_1-gcc-12.2.0
+
+nextflow-exe "$@"' > ~/bin/nextflow
+```
+
+test running nextflow
+```
+nextflow info
+```
+
+To run the pipeline, downloads the counts and create the samples file as in set-up above
+```
+baseDir=/data/scratch/USER/zmp-network
+mkdir $baseDir
+```
+
+Clone the repository and run
+```
+mkdir checkouts
+cd ~/checkouts
+git clone git@github.com:richysix/zmp-network.git
+
+# run the pipeline
+qsub -m bea -M email \
+"nextflow run -profile apptainer,apocrita \
+--ref_dir reference --samples $baseDir/expt-sample-condition-tfap2-plus.tsv \
+--all_counts $baseDir/all.csv.gz -resume \
+~/checkouts/zmp-network/main.nf"
+```
