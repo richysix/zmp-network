@@ -49,8 +49,8 @@ def load_annotation(anno_file, args = None):
     idx_for = {}
     gene_id_for = {}
     with open(anno_file) as anno_fh:
-        with open("agg-network.nodes.tsv", mode='w') as nodes_fh:
-            print(f"node_idx\tGeneID", file=nodes_fh)
+        with open(f"{args.output_base}-network.nodes.tsv", mode='w') as nodes_fh:
+            print(f"node_idx\tgene_id", file=nodes_fh)
             col_name_for = {
                 0: "GeneID",
                 1: "Chr",
@@ -89,11 +89,16 @@ def main(args):
     ''' Main body of code '''
     # load gene annotation
     idx_for, gene_id_for = load_annotation(args.annotation, args)
+    if args.debug > 1:
+        print(idx_for, file=sys.stderr)
+        print(gene_id_for, file=sys.stderr)
     num_genes = len(idx_for)
     fofn = [sample(args.input_files, len(args.input_files)) for x in range(args.orderings)]
+    print("Files:\n", file=sys.stderr)
 
     # loop through input files
     for i, files in enumerate(fofn):
+        print(files, file=sys.stderr)
         # make base aggregate network
         agg = pd.DataFrame(
             np.zeros(shape=(num_genes, num_genes)),
@@ -110,24 +115,28 @@ def main(args):
             # rank and standardise
             agg = rank_and_standardise(agg)
             # output aggregated network
-            filename = f"agg-ordering{i+1}-networks{j+1}.mat.gz"
+            filename = f"{args.output_base}-ordering{i+1}-networks{j+1}.mat.gz"
             output_network(agg, filename)
-        filename = f"agg-ordering{i+1}-networks{j+2}.mat.gz"
+        filename = f"{args.output_base}-ordering{i+1}-networks{j+2}.mat.gz"
         output_network(net, filename)
-        filename = f"agg-ordering{i+1}-networks{j+2}.edges.gz"
+        filename = f"{args.output_base}-ordering{i+1}-networks{j+2}.edges.gz"
         # prune network to top 10%
-        agg[agg < 0.9] = 0
+        threshold = np.quantile(agg, 0.9)
+        agg[agg < threshold] = 0
         # print network as edges file
         # as most edges have been set to zero
         colnames = list(agg.columns.values)
         with gzip.open(filename, 'wt') as out_fh:
-            for i in range(len(agg)):
+            print(f"edge_idx\tsource\ttarget\tweight", file = out_fh)
+            edge_i = 0
+            for i in range(len(colnames)):
                 row = colnames[i]
                 j = 0
                 while i > j:
                     col = colnames[j]
                     if agg.loc[row, col] != 0:
-                        print(f"{row}\t{col}\t{agg.loc[row, col]}", file = out_fh)
+                        print(f"{edge_i}\t{idx_for[row]}\t{idx_for[col]}\t{agg.loc[row, col]}", file = out_fh)
+                        edge_i += 1
                     j += 1
 
 if __name__ == '__main__':
@@ -135,6 +144,9 @@ if __name__ == '__main__':
     parser.add_argument('input_files', nargs='*', metavar='FILE',
         type=str, default=sys.stdin, 
         help='Input matrix files')
+    parser.add_argument('--output_base', metavar='OUT FILE BASE',
+        type=str, default="agg", 
+        help='Base file name for the output networks')
     parser.add_argument('--annotation', metavar='ANNOTATION FILE',
         type=str, default="annotation.txt", 
         help='Gene annotation file')

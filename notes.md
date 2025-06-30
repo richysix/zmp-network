@@ -1040,3 +1040,20 @@ cat <( echo "\`\`\`mermaid" ) \
 results/pipeline_info/pipeline_dag_${timestamp}.mmd \
 <( echo "\`\`\`" ) > $gitdir/docs/_dag-current.md
 ```
+
+### Aggregate networks
+
+Made script to aggregate the networks
+Run 10 jobs with different file orderings
+```
+for i in $( seq 10 )
+do rand=$( openssl rand -hex 3 )
+echo "python ~/checkouts/zmp-network/bin/aggregate-networks.py --annotation /data/scratch/bty114/zmp-network/nf/reference/danio_rerio-e99-annotation.txt --output_base agg-${rand}  --orderings 1 zmp_ph*-tpm-filtered-orig.mat"
+done > python-array.txt 
+```
+
+Run as job array
+```
+qsub -l h_rt=120:0:0 -l h_vmem=128G -l highmem -t 1-2 ~/checkouts/uge-job-scripts/python-array.sh python-array.txt
+qsub -l h_rt=120:0:0 -l h_vmem=128G -l highmem -t 3-10 ~/checkouts/uge-job-scripts/python-array.sh python-array.txt
+```
