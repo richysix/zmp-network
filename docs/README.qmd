@@ -10,6 +10,41 @@ individual networks into one aggregate network.
 
 ![](docs/schematic.excalidraw.svg)
 
+## Installation
+
+Install [Nextflow](https://www.nextflow.io/docs/latest/install.html)
+
+Clone the repo
+```
+git clone https://github.com/richysix/zmp-network.git
+export gitdir=/path/to/gitdir
+```
+
+## Run the pipeline
+
+```
+# testing
+nextflow run -profile test,local $gitdir/scripts/main.nf
+
+# Run using Apptainer conatiners
+nextflow run -profile apptainer $gitdir/scripts/main.nf
+
+# Run on Apocrita
+nextflow run -profile apptainer,apocrita $gitdir/scripts/main.nf
+```
+
+## Parameters
+
+Default values for the parameters are defined in the nextflow.config file. These
+values can be overriden on the command line by adding the parameter name as an 
+option with the value
+
+e.g.
+```nextflow run -profile apptainer,apocrita \
+--samples expt-sample-condition-tfap2-plus.tsv \
+--all_counts all.csv.gz
+```
+
 ## Processes
 
 ### LOG_INFO

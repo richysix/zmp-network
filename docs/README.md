@@ -7,6 +7,35 @@ to combine the individual networks into one aggregate network.
 
 ![](docs/schematic.excalidraw.svg)
 
+## Installation
+
+Install [Nextflow](https://www.nextflow.io/docs/latest/install.html)
+
+Clone the repo
+
+    git clone https://github.com/richysix/zmp-network.git
+    export gitdir=/path/to/gitdir
+
+## Run the pipeline
+
+    # testing
+    nextflow run -profile test,local $gitdir/scripts/main.nf
+
+    # Run using Apptainer conatiners
+    nextflow run -profile apptainer $gitdir/scripts/main.nf
+
+    # Run on Apocrita
+    nextflow run -profile apptainer,apocrita $gitdir/scripts/main.nf
+
+## Parameters
+
+Default values for the parameters are defined in the nextflow.config
+file. These values can be overriden on the command line by adding the
+parameter name as an option with the value
+
+e.g.
+`nextflow run -profile apptainer,apocrita \ --samples expt-sample-condition-tfap2-plus.tsv \ --all_counts all.csv.gz`
+
 ## Processes
 
 ### LOG_INFO
@@ -145,26 +174,6 @@ Outputs:
 
 Script: Runs `mcx alter` and `mcx query`
 
-### FILTER_STATS
-
-Produces plots based on the filtering data
-
-Inputs:
-
-1.  Path for experiment names file
-1.  Samples file: Tab-separated file, must contain columns `expt` and
-    `sample`
-1.  correlation histogram files produced by CREATE_BASE_NETWORK
-1.  filtered correlation histogram files produced by CREATE_BASE_NETWORK
-1.  Stats on vary the correlation threshold from TEST_PARAMETERS
-1.  Stats from filtering from FILTER_COR/FILTER_KNN
-
-Outputs:
-
-1.  Directory of plot files
-
-Script: Runs edge-filtering-analysis.R script
-
 ### CLUSTER_NETWORK
 
 Clusters the supplied network.
@@ -261,7 +270,7 @@ Outputs:
 3.  html: html output showing % of nodes in each network of sizes
     between 100 and 1000
 
-### RUN_GO_ENRICHMENT
+### ENRICHMENT
 
 Runs topGO enrichment on the individual clusters in the network
 
@@ -434,11 +443,3 @@ flowchart TB
     v55 --> v57
     v57 --> v58
 ```
-
-## Running the pipeline
-
-To run the pipeline you need 
-[nextflow](https://www.nextflow.io/docs/latest/install.html) installed.
-
-Config files to set parameters for the pipeline are in nextflow.config and 
-files in the config directory.
