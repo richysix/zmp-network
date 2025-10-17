@@ -107,7 +107,7 @@ process CREATE_BASE_NETWORK {
     """
     awk -F"\\t" '{if(NR > 1){ print \$2 "\\t" \$3 }}' \
         ${sample_file} > ${expt}-samples.txt
-    mv ${sample_file} > ${expt}-samples.tsv
+    mv ${sample_file} ${expt}-samples.tsv
 
     module load R/${params.r_version}
     counts-to-fpkm-tpm.R \
