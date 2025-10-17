@@ -56,7 +56,7 @@ The pipeline expects a sample info file and a counts file.
 
 e.g.
 
-|expt-----|sample------|condition|
+|expt|sample|condition|
 |:--------|:-----------|:---|
 |zmp_ph198|zmp_ph198_A1|sib |
 |zmp_ph198|zmp_ph198_A2|sib |
@@ -68,6 +68,14 @@ are counts for samples.
   - Gene Name. Optional
   - Sample count columns. Column names should be "<sample_name> count" with the 
   sample names matching those in the sample file.
+
+e.g.
+
+|GeneID|Gene name|zmp_ph198_A1 count|zmp_ph198_A2 count|
+|:-----------------|:-----------|----:|----:|
+|ENSDARG00000000001|zmp_ph198_A1|0.678|9.873|
+|ENSDARG00000000002|zmp_ph198_A2|11.92|123.5|
+
 
 ## Processes
 
