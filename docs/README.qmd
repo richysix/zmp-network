@@ -40,10 +40,34 @@ values can be overriden on the command line by adding the parameter name as an
 option with the value
 
 e.g.
+
 ```nextflow run -profile apptainer,apocrita \
 --samples expt-sample-condition-tfap2-plus.tsv \
 --all_counts all.csv.gz
 ```
+
+The pipeline expects a sample info file and a counts file.
+
+- Sample file: A tab-separated file with sample information
+  - Experiment name
+  - Sample name
+  - Condition (mut/sib etc). This information is not required for the pipeline, 
+  but will help interpreting the networks later
+
+e.g.
+
+|expt-----|sample------|condition|
+|:--------|:-----------|:---|
+|zmp_ph198|zmp_ph198_A1|sib |
+|zmp_ph198|zmp_ph198_A2|sib |
+
+
+- Counts file: A tab-separated file, in which rows represent genes and columns 
+are counts for samples.
+  - GeneID
+  - Gene Name. Optional
+  - Sample count columns. Column names should be "<sample_name> count" with the 
+  sample names matching those in the sample file.
 
 ## Processes
 
