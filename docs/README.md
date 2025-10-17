@@ -35,7 +35,9 @@ parameter name as an option with the value
 
 e.g.
 
-`nextflow run -profile apptainer,apocrita \ --samples expt-sample-condition-tfap2-plus.tsv \ --all_counts all.csv.gz`
+    nextflow run -profile apptainer,apocrita \
+    --samples expt-sample-condition-tfap2-plus.tsv \
+    --all_counts all.csv.gz
 
 The pipeline expects a sample info file and a counts file.
 
@@ -53,7 +55,8 @@ e.g.
 | zmp_ph198 | zmp_ph198_A2 | sib       |
 
 - Counts file: A tab-separated file, in which rows represent genes and
-  columns are counts for samples.
+  columns are counts for samples. The counts file can be *gzipped* to
+  save space.
   - GeneID
   - Gene Name. Optional
   - Sample count columns. Column names should be “<sample_name> count”
@@ -65,6 +68,25 @@ e.g.
 |:-------------------|:-------------|-------------------:|-------------------:|
 | ENSDARG00000000001 | zmp_ph198_A1 |              0.678 |              9.873 |
 | ENSDARG00000000002 | zmp_ph198_A2 |              11.92 |              123.5 |
+
+The full set of parameters can be found in the nextflow.config file. A
+few are explained below.
+
+- `clustering` Whether the second clustering half of the pipeline should
+  be run
+- `ref_dir` Name of the directory to store reference files (annotation
+  files etc.)
+- `species` Name of the species. snake_case (e.g. danio_rerio)
+- `ensembl_version` Version of the ensembl database to use
+- `ensembl_versionGO` Version of the ensembl database to use for GO
+  enrichment. Can be different from the ensembl version if newer
+  annotation is required
+- `high_cor_filter_threshold` A threshold for filtering. Genes where
+  most of the samples have zero counts are liable to have artificially
+  high correlation coefficients with other genes that also have mostly
+  zero values. This threshold sets how many genes with abnormally high
+  correlation values are allowed before genes are removed. See
+  [CREATE_BASE_NETWORK](#create-base-network) for more details
 
 ## Processes
 

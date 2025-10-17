@@ -41,7 +41,8 @@ option with the value
 
 e.g.
 
-```nextflow run -profile apptainer,apocrita \
+```
+nextflow run -profile apptainer,apocrita \
 --samples expt-sample-condition-tfap2-plus.tsv \
 --all_counts all.csv.gz
 ```
@@ -63,7 +64,7 @@ e.g.
 
 
 - Counts file: A tab-separated file, in which rows represent genes and columns 
-are counts for samples.
+are counts for samples. The counts file can be *gzipped* to save space.
   - GeneID
   - Gene Name. Optional
   - Sample count columns. Column names should be "<sample_name> count" with the 
@@ -76,6 +77,20 @@ e.g.
 |ENSDARG00000000001|zmp_ph198_A1|0.678|9.873|
 |ENSDARG00000000002|zmp_ph198_A2|11.92|123.5|
 
+The full set of parameters can be found in the nextflow.config file. A few are 
+explained below.
+
+- `clustering`    Whether the second clustering half of the pipeline should be run
+- `ref_dir`       Name of the directory to store reference files (annotation files etc.)
+- `species`       Name of the species. snake_case (e.g. danio_rerio)
+- `ensembl_version`    Version of the ensembl database to use
+- `ensembl_versionGO`    Version of the ensembl database to use for GO enrichment.
+Can be different from the ensembl version if newer annotation is required
+- `high_cor_filter_threshold`    A threshold for filtering. Genes where most of 
+the samples have zero counts are liable to have artificially high correlation 
+coefficients with other genes that also have mostly zero values. This threshold 
+sets how many genes with abnormally high correlation values are allowed before 
+genes are removed. See [CREATE_BASE_NETWORK](#create-base-network) for more details
 
 ## Processes
 
@@ -109,7 +124,7 @@ count file for `CREATE_BASE_NETWORK`.
 Script:
     Runs `subset-by-expt.sh` which in turn runs `subset-by-expt.py`
 
-### CREATE_BASE_NETWORK
+### CREATE_BASE_NETWORK {#create-base-network}
 
 Creates a base correlation network containing ALL edges and one with 
 edge weights converted to absolute values and edges with weights less than 
