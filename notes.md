@@ -1084,22 +1084,56 @@ test running nextflow
 nextflow info
 ```
 
-To run the pipeline, downloads the counts and create the samples file as in set-up above
+To run the pipeline, download the counts and create the samples file
 ```
 baseDir=/data/scratch/USER/zmp-network
 mkdir $baseDir
+
+rclone copy --progress --max-depth 1 --filter "+ all.csv.gz" --filter "- *" \
+sharepoint-qmul-buschlab:detct/grcz11/everything/filter-strict/ $baseDir/
+
+rclone copy --verbose --filter "+ samples.txt" --filter "- *" \
+sharepoint-qmul-buschlab:detct/grcz11/everything/ $baseDir/
+
+# get expt and sample info
+rclone copy --verbose --filter "+ expt2samples.txt" --filter "- *" \
+sharepoint-qmul-buschlab:detct/grcz11/local_effect/ $baseDir/
+```
+
+Create file of expt names, sample names and conditions
+```
+join -t$'\t' -1 2 <( sort -t$'\t' -k2,2 $baseDir/expt2samples.txt ) \
+<( sort -t$'\t' -k1,1 $baseDir/samples.txt ) | \
+awk -F"\t" 'BEGIN{ OFS = "\t" } { print $2, $1, $4 }' | sort -u | \
+cat <( echo -e "expt\tsample\tcondition" ) - > $baseDir/expt-sample-condition.tsv
+# subset for testing
+grep -E "^expt|(capzb1_hi1858bTg|dnmt8|zmp_ph1)\b" \
+expt-sample-condition.tsv > $baseDir/expt-sample-condition-test.tsv
+grep -E "^expt|zmp_ph(192|238|250)\b" \
+expt-sample-condition.tsv > $baseDir/expt-sample-condition-tfap2.tsv
 ```
 
 Clone the repository and run
 ```
-mkdir checkouts
-cd ~/checkouts
+mkdir -p $HOME/checkouts
+cd $HOME/checkouts
 git clone git@github.com:richysix/zmp-network.git
+export gitdir=$HOME/checkouts/zmp-network
 
-# run the pipeline
-qsub -m bea -M email \
+# run the pipeline test
+cd $baseDir
+qlogin
+nextflow run -profile test,local $gitdir/scripts/main.nf"
+# If it works, end the qlogin job with CTRL + D
+
+# submit the pipeline as a job
+cd $baseDir
+# the -m option to qsub sets when an email will be sent, b = beginning of job, e = end of job, a = job aborted
+# the -M option is for the email address to be emailed
+sampleFile=$baseDir/expt-sample-condition-tfap2.tsv
+qsub -m bea -M <email_address> \
 "nextflow run -profile apptainer,apocrita \
---ref_dir reference --samples $baseDir/expt-sample-condition-tfap2-plus.tsv \
+--ref_dir reference --samples $sampleFile \
 --all_counts $baseDir/all.csv.gz -resume \
-~/checkouts/zmp-network/main.nf"
+$gitdir/scripts/main.nf"
 ```
